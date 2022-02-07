@@ -1,5 +1,5 @@
 /* 
-   Copyright (C) 2021 Magnusson Institute, All Rights Reserved
+   Copyright (C) 2019-2021 Magnusson Institute, All Rights Reserved
 
    "Snackabra" is a registered trademark
 
