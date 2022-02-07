@@ -38,8 +38,7 @@ Setup (Personal Storage Server)
 
 The current room server requires a domain name and a Cloudflare (CF)
 account. Currently, a free CF account is _almost_ sufficient, but
-"Worker KV" needs a paid add-on (pay per use).  (See 'Future
-Directions' below.)
+"Worker KV" needs a paid-per-use add-on (*).
 
 If you haven't already done so, you might want to set up your personal
 room server first
@@ -126,18 +125,15 @@ And point a client to it. (Note: you currently cannot run ``wrangler dev``, beca
 CF Durable Objects are not yet supported in preview mode.)
 
 
-(*) We are not affiliated in any way with Cloudflare, we're just fans
-of their most recent cloud tech. We do plan to have a pure node version
-of the personal server in the near future.
 
 (**) At time of writing, the link was:
 https://dash.cloudflare.com/6a24dd354a78c1e313b1b8054d75e506/workers/overview?enable-durable-objects
 
     
 
+Notes
+-----
 
-Future Directions
------------------
 
 The server is currently oriented towards running on Cloudflare (CF)
 workers using key-value (KV) store; the CF free level supports only up
@@ -153,21 +149,6 @@ straightforward to add support for this code to run in a node
 server with e.g. levelup (https://github.com/Level/levelup).
 
 
-
-Notes
------
-
-The snackabra web (app) client is a reference fully featured
-web client for the snackabra set of communication and data
-sharing services. It will default to connect to rooms
-on https://privacy.app but you can configure it to connect
-to any snackabra server (including your own, obviously).
-
-The app is written in (mostly) React Native and based on the
-(exellent) Gifted Chat code [1].
-
-
-
 Directory
 ---------
 
@@ -181,17 +162,10 @@ Following files should be present:
     ├── setup
     │   └── template.wrangler.toml
     ├── snackabra.svg
-    ├── src
-    │   ├── index.js
-    │   ├── package.json
-    │   └── utils.js
-    └── wrangler.toml
-
-
-References
-----------
-
-[1] https://github.com/FaridSafi/react-native-gifted-chat
+    └── src
+        ├── index.js
+        ├── package.json
+        └── utils.js
 
 
 LICENSE
