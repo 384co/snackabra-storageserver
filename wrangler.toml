@@ -1,0 +1,26 @@
+name = "s"
+type = 'javascript'
+account_id = "6a24dd354a78c1e313b1b8054d75e506"
+
+route = ''
+zone_id = ''
+usage_model = ''
+workers_dev = true
+compatibility_date = "2022-02-01"
+
+kv_namespaces = [
+  { binding = "MESSAGES_NAMESPACE", id = "28caf3908f0e4787a3740ffa389b8565" },
+  { binding = "KEYS_NAMESPACE", id = "d4afde0b00b84d43a5c86cfaf75025af" },
+  { binding = "LEDGER_NAMESPACE", id = "80df6ce2208f4abdb66054e35df567fc" },
+  { binding = "IMAGES_NAMESPACE", id = "b5d6021fe9ba455b8d4bc196adc83c54" },
+  { binding = "RECOVERY_NAMESPACE", id = "b14f8003b477422b8b83d63e12107688" }
+]
+
+[build.upload]
+format = "modules"
+dir = "src"
+main = "index.js"
+
+[[build.upload.rules]]
+type = "ESModule"
+globs = ["**/*.js"]

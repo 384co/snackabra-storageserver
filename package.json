@@ -1,0 +1,7 @@
+{
+  "name": "socket-api",
+  "description": "",
+  "version": "1.0.0",
+  "module": "./src/chat.mjs",
+  "private": true
+}

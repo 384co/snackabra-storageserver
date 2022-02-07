@@ -1,0 +1,39 @@
+# Copyright (c) 2016-2021 Magnusson Institute, All Rights Reserved.
+
+# setup:
+# copy this file to the top level and rename it 'wrangler.toml'
+# insert the pertinent id:s from Cloudflare dashboard
+
+# Personal Storage ('s') Server
+# 's' will be the name on CF, ergo "s.<your CF comain>.workers.dev"
+name = "s"
+
+type = 'javascript'
+workers_dev = true
+compatibility_date = "2022-02-01"
+
+# Replace with your account id
+account_id = '<your Account Id>'
+
+route = ''
+zone_id = ''
+usage_model = ''
+
+# You need to set up these KV namespaces in the CF dashboard, and
+# copy-paste their id:s here. Note that some namespaces are shared
+# with the Room server, in case you're running both.
+kv_namespaces = [
+  { binding = "KEYS_NAMESPACE", id = "<id>" },
+  { binding = "LEDGER_NAMESPACE", id = "<id>" },
+  { binding = "IMAGES_NAMESPACE", id = "<id>" },
+  { binding = "RECOVERY_NAMESPACE", id = "<id>" }
+]
+
+[build.upload]
+format = "modules"
+dir = "src"
+main = "index.js"
+
+[[build.upload.rules]]
+type = "ESModule"
+globs = ["**/*.js"]
