@@ -108,7 +108,7 @@ your ```wrangler.toml``` file.
 Finally, you need to make a tiny change to your copy of
 the server code, providing a 'secret'. This is essentially a simple
 auth token that your server will request every time you create a new
-room, or migrate a room over from somewhere else.[#f01]_
+room, or migrate a room over from somewhere else.
 
 ::
 
@@ -134,16 +134,6 @@ of the personal server in the near future.
 https://dash.cloudflare.com/6a24dd354a78c1e313b1b8054d75e506/workers/overview?enable-durable-objects
 
     
-.. rubric:: Footnotes
-
-.. [#f01] Test footnote.
-
-
-Setup (Public Server)
------------------------
-
-To Be Written.
-
 
 
 Future Directions
@@ -177,25 +167,31 @@ The app is written in (mostly) React Native and based on the
 (exellent) Gifted Chat code [1].
 
 
-References
-----------
-
 
 Directory
 ---------
 
-Following files should be in the git::
+Following files should be present:
 
 ::
     .
-    ├── LICENSE.rst
+    ├── LICENSE.md
     ├── README.rst
+    ├── package.json
+    ├── setup
+    │   └── template.wrangler.toml
     ├── snackabra.svg
-    └── socket_api
-	├── package.json
-	├── src
-	│   └── chat.mjs
-	└── wrangler.toml  
+    ├── src
+    │   ├── index.js
+    │   ├── package.json
+    │   └── utils.js
+    └── wrangler.toml
+
+
+References
+----------
+
+[1] https://github.com/FaridSafi/react-native-gifted-chat
 
 
 LICENSE
@@ -205,24 +201,35 @@ Copyright (c) 2016-2021 Magnusson Institute, All Rights Reserved.
 
 "Snackabra" is a registered trademark
 
-Permission is hereby granted, free of charge, to any person obtaining
-a copy of this software and associated documentation files (the
-"Software"), to deal in the Software without restriction, including
-without limitation the rights to use, copy, modify, merge, publish,
-distribute, sublicense, and/or sell copies of the Software, and to
-permit persons to whom the Software is furnished to do so, subject to
-the following conditions:
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as
+published by the Free Software Foundation, either version 3 of the
+License, or (at your option) any later version.
 
-The above copyright notice, the above trademark notice, and this
-permission notice shall be included in all copies or substantial
-portions of the Software.
+This program is distributed in the hope that it will be useful, but
+WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+Affero General Public License for more details.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-NON-INFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
-LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
-OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
-WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+Licensed under GNU Affero General Public License
+https://www.gnu.org/licenses/agpl-3.0.html
 
 
+Cryptography Notice
+-------------------
+
+This distribution includes cryptographic software. The country in
+which you currently reside may have restrictions on the import,
+possession, use, and/or re-export to another country, of encryption
+software. Before using any encryption software, please check your
+country's laws, regulations and policies concerning the import,
+possession, or use, and re-export of encryption software, to see if
+this is permitted. See http://www.wassenaar.org/ for more information.
+
+United States: This distribution employs only "standard cryptography"
+under BIS definitions, and falls under the Technology Software
+Unrestricted (TSU) exception.  Futher, per the March 29, 2021,
+amendment by the Bureau of Industry & Security (BIS) amendment of the
+Export Administration Regulations (EAR), this "mass market"
+distribution does not require reporting (see
+https://www.govinfo.gov/content/pkg/FR-2021-03-29/pdf/2021-05481.pdf ).

@@ -1,4 +1,24 @@
-/* Copyright (c) 2021 Magnusson Institute, All Rights Reserved */
+/* 
+   Copyright (C) 2021 Magnusson Institute, All Rights Reserved
+
+   "Snackabra" is a registered trademark
+
+   This program is free software: you can redistribute it and/or
+   modify it under the terms of the GNU Affero General Public License
+   as published by the Free Software Foundation, either version 3 of
+   the License, or (at your option) any later version.
+
+   This program is distributed in the hope that it will be useful, but
+   WITHOUT ANY WARRANTY; without even the implied warranty of
+   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+   Affero General Public License for more details.
+
+   You should have received a copy of the GNU Affero General Public
+   License along with this program.  If not, see www.gnu.org/licenses/
+
+*/
+
+
 
 /**
  * The DEBUG flag will do two things that help during development:
@@ -66,26 +86,6 @@ function returnResult(request, contents, s) {
   return new Response(contents, { status: s, headers: corsHeaders });
 }
 
-// // Handles any unforeseen errors
-// // TODO - figure out exactly when/what this is?
-// function handleError(error) {
-//     console.error('Uncaught error:', error)
-// 
-//     const { stack } = error
-// 
-//     return new Response(stack || error, {
-//         status: 500,
-//         headers: {
-//           'Content-Type': 'text/plain;charset=UTF-8'
-//         }
-//     })
-// }
-
-
-// Cloudflare: "We support the GET, POST, HEAD, and OPTIONS methods from any origin, and accept the Content-Type header on requests. These headers must be present on all responses to all CORS requests. In practice, this means all responses to OPTIONS or POST requests."
-// Need these headers for CORS
-
-// Handles the OPTIONS request made by browsers. Need to return CORS headers
 function handleOptions(request) {
   if (request.headers.get("Origin") !== null &&
     request.headers.get("Access-Control-Request-Method") !== null &&

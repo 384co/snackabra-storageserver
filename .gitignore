@@ -1,0 +1,8 @@
+# we don't overwrite the one on Git; use the template in setup to start
+wranger.toml
+
+# psm uses emacs ...
+*~
+.#*
+*~
+\#*
