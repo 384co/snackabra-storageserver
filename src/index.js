@@ -359,15 +359,21 @@ async function handleMigrateStorage(request, env) {
     }
     delete json['SERVER_SECRET']
     for (let key in json) {
-      let kv_key = "____" + "p" + "__" + key + "______";
-      let reqUrl = "https://" + targetURL + "/api/v1/fetchDataMigration?id=" + encodeURIComponent(key) + "&verification_token=" + json[key] + "&type=p";
+      const key_parts = key.split(".");
+      const key_id = key_parts[0];
+      let type = key_parts[1];
+      if (type !== "p" && type !== "f") {
+        type = "p";
+      }
+      let reqUrl = "https://" + targetURL + "/api/v1/fetchDataMigration?id=" + encodeURIComponent(key_id) + "&verification_token=" + json[key] + "&type=" + type;
       let fetch_req = await fetch(reqUrl);
-      if (fetch_req.status === 500) {
-        reqUrl = "https://" + targetURL + "/api/v1/fetchDataMigration?id=" + encodeURIComponent(key) + "&verification_token=" + json[key] + "&type=f";
+      if (fetch_req.status === 500 && type !== "f") {
+        type = "f";
+        reqUrl = "https://" + targetURL + "/api/v1/fetchDataMigration?id=" + encodeURIComponent(key_id) + "&verification_token=" + json[key] + "&type=" + type;
         fetch_req = await fetch(reqUrl);
-        kv_key = "____" + "f" + "__" + key + "______";
       }
       let ab = await fetch_req.arrayBuffer();
+      const kv_key = "____" + type + "__" + key_id + "______";
       env.IMAGES_NAMESPACE.put(kv_key, ab);
     }
     return returnResult(request, JSON.stringify({ success: true }), 200)
