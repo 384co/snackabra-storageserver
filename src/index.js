@@ -236,6 +236,13 @@ async function handleStoreData(request, env) {
     // const storageToken = data.storageToken;
     let verification_token;
 
+    const _storage_token = JSON.parse((new TextDecoder).decode(data.storageToken));
+    let _ledger_resp = JSON.parse(await env.LEDGER_NAMESPACE.get(_storage_token.token_hash));
+
+    if (!verifyStorage(data, image_id, env, _ledger_resp)) {
+      return returnResult(request, JSON.stringify({ error: 'Ledger(s) refused storage request - authentication or storage budget issue, or malformed request' }), 500);
+    }
+
     const stored_data = await env.IMAGES_NAMESPACE.get(key, { type: "arrayBuffer" });
     if (stored_data == null) {
       verification_token = crypto.getRandomValues(new Uint16Array(4)).buffer;
@@ -249,12 +256,6 @@ async function handleStoreData(request, env) {
       verification_token = data.verification_token;
     }
     console.log("Extracted data: ", data)
-    const _storage_token = JSON.parse((new TextDecoder).decode(data.storageToken));
-    let _ledger_resp = JSON.parse(await env.LEDGER_NAMESPACE.get(_storage_token.token_hash)).then( _L => { if (!_L) {  return returnResult(request, JSON.stringify({ error: "Authentication failure on storage ledger" }), 500)}});
-
-    if (!verifyStorage(data, image_id, env, _ledger_resp)) {
-      return returnResult(request, JSON.stringify({ error: 'Could not verify data' }), 200);
-    }
 
     _ledger_resp.used = true;
     let _put_resp = await env.LEDGER_NAMESPACE.put(_storage_token.token_hash, JSON.stringify(_ledger_resp));
