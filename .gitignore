@@ -6,3 +6,5 @@ wranger.toml
 .#*
 *~
 \#*
+wrangler.toml
+.secret.*

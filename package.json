@@ -1,7 +1,8 @@
 {
-  "name": "socket-api",
-  "description": "",
-  "version": "1.0.0",
-  "module": "./src/chat.mjs",
-  "private": true
+    "name": "snackabra-storageserver",
+    "description": "",
+    "version": "0.4.2",
+    "module": "./src/chat.mjs",
+    "license": "GPL-3.0-only",
+    "private": true
 }
