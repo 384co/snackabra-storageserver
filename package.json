@@ -4,5 +4,9 @@
     "version": "0.4.2",
     "module": "./src/chat.mjs",
     "license": "GPL-3.0-only",
-    "private": true
+    "private": true,
+    "devDependencies": {
+        "eslint": "^8.8.0",
+        "eslint-plugin-react": "^7.28.0"
+    }
 }

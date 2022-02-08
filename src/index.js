@@ -42,7 +42,7 @@ export default {
   }
 }
 
-async function handleRequest(request, env, ctx) {
+async function handleRequest(request, env) {  // not using ctx
 
   try {
     let options = {}
@@ -53,8 +53,8 @@ async function handleRequest(request, env, ctx) {
       };
     }
     const { method, url } = request
-    const { host, pathname } = new URL(url)
-    if (request.method === "OPTIONS") {
+    const { pathname } = new URL(url)
+    if (method === "OPTIONS") {
       return handleOptions(request)
     }
     else if (pathname.split('/')[1] === 'api') {
@@ -102,7 +102,7 @@ function handleOptions(request) {
 }
 
 async function handleApiCall(request, env) {
-  const { host, pathname } = new URL(request.url);
+  const { pathname } = new URL(request.url);
   const fname = pathname.split('/')[3];
   try {
     switch (fname) {
@@ -120,7 +120,7 @@ async function handleApiCall(request, env) {
         // TODO ... if there's something better to return, otherwise error
         return returnResult(request, "Disallow: /", 500);
       default:
-        return handleDevelopmentMode(request);
+        return handleDevelopmentMode();
     }
   } catch (error) {
     console.log(error)
@@ -128,7 +128,7 @@ async function handleApiCall(request, env) {
   }
 }
 
-function handleDevelopmentMode(request) {
+function handleDevelopmentMode() {
 
   const html = `<!doctypehtml> <html> <body> <div style="display: block; font-weight: bold; padding: 5%; margin: auto; font-family: countach,sans-serif; line-height: 1; margin: 0;"> <h1 style="text-align: center;"> This feature is currently under development. Stay tuned! </h3> </div> </body> </html>
   `
@@ -139,53 +139,55 @@ function handleDevelopmentMode(request) {
   })
 }
 
-async function verifyCookie(request, env) {
+// async function verifyCookie(request, env) {
 
-  // Parse cookie code from https://stackoverflow.com/questions/51812422/node-js-how-can-i-get-cookie-value-by-cookie-name-from-request
-  try {
-    console.log("In verify cookie")
-    let cookies = {};
-    const { searchParams } = new URL(request.url);
-    const room_id = searchParams.get('roomId');
-    request.headers.has('cookie') && request.headers.get('cookie').split(';').forEach(function (cookie) {
-      let parts = cookie.match(/(.*?)=(.*)$/)
-      cookies[parts[1].trim()] = (parts[2] || '').trim();
-    });
-    if (!cookies.hasOwnProperty('token_' + room_id)) {
-      return false;
-    }
-    console.log(cookies);
-    const verificationKey = await crypto.subtle.importKey("jwk", JSON.parse(await env.KEYS_NAMESPACE.get(room_id + '_authorizationKey')), { name: "ECDSA", namedCurve: "P-384" }, false, ["verify"]);
-    const auth_parts = cookies['token_' + room_id].split('.');
-    const payload = auth_parts[0];
-    const sign = auth_parts[1];
-    //console.log(payload, sign);
-    return (await verifySign(verificationKey, sign, payload + '_' + room_id) && ((new Date()).getTime() - parseInt(payload)) < 86400000);
-  } catch (error) {
-    return false;
-  }
-}
+//   // Parse cookie code from https://stackoverflow.com/questions/51812422/node-js-how-can-i-get-cookie-value-by-cookie-name-from-request
+//   try {
+//     console.log("In verify cookie")
+//     let cookies = {};
+//     const { searchParams } = new URL(request.url);
+//     const room_id = searchParams.get('roomId');
+//     request.headers.has('cookie') && request.headers.get('cookie').split(';').forEach(function (cookie) {
+//       let parts = cookie.match(/(.*?)=(.*)$/)
+//       cookies[parts[1].trim()] = (parts[2] || '').trim();
+//     });
+//     if (!cookies.hasOwnProperty('token_' + room_id)) {
+//       return false;
+//     }
+//     console.log(cookies);
+//     const verificationKey = await crypto.subtle.importKey("jwk", JSON.parse(await env.KEYS_NAMESPACE.get(room_id + '_authorizationKey')), { name: "ECDSA", namedCurve: "P-384" }, false, ["verify"]);
+//     const auth_parts = cookies['token_' + room_id].split('.');
+//     const payload = auth_parts[0];
+//     const sign = auth_parts[1];
+//     //console.log(payload, sign);
+//     return (await verifySign(verificationKey, sign, payload + '_' + room_id) && ((new Date()).getTime() - parseInt(payload)) < 86400000);
+//   } catch (error) {
+//     return false;
+//   }
+// }
 
-async function verifySign(secretKey, sign, contents) {
-  try {
-    const _sign = utils.base64ToArrayBuffer(decodeURIComponent(sign));
-    const encoder = new TextEncoder();
-    const encoded = encoder.encode(contents);
-    //console.log(secretKey, _sign, encoded)
-    let verified = await crypto.subtle.verify(
-      { name: 'ECDSA', hash: 'SHA-256' },
-      secretKey,
-      _sign,
-      encoded
-    );
-    //console.log("TRUE");
-    return verified;
-  } catch (e) {
-    console.log(e)
-    //console.log("FALSE");
-    return false;
-  }
-}
+
+
+// async function verifySign(secretKey, sign, contents) {
+//   try {
+//     const _sign = utils.base64ToArrayBuffer(decodeURIComponent(sign));
+//     const encoder = new TextEncoder();
+//     const encoded = encoder.encode(contents);
+//     //console.log(secretKey, _sign, encoded)
+//     let verified = await crypto.subtle.verify(
+//       { name: 'ECDSA', hash: 'SHA-256' },
+//       secretKey,
+//       _sign,
+//       encoded
+//     );
+//     //console.log("TRUE");
+//     return verified;
+//   } catch (e) {
+//     console.log(e)
+//     //console.log("FALSE");
+//     return false;
+//   }
+// }
 
 
 async function handleStoreRequest(request, env) {
@@ -199,8 +201,12 @@ async function handleStoreRequest(request, env) {
       const val = await env.IMAGES_NAMESPACE.get(key, { type: "arrayBuffer" });
       data = utils.extractPayload(val);
     }
-    const salt = data.hasOwnProperty('salt') ? data.salt : crypto.getRandomValues(new Uint8Array(16));
-    const iv = data.hasOwnProperty('iv') ? data.iv : crypto.getRandomValues(new Uint8Array(12));
+    const salt = Object.prototype.hasOwnProperty.call(data, 'salt') ? data.salt : crypto.getRandomValues(new Uint8Array(16));
+    const iv = Object.prototype.hasOwnProperty.call(data, 'iv') ? data.iv : crypto.getRandomValues(new Uint8Array(12));
+    // subtle not doing this:
+    // const salt = data.hasOwnProperty('salt') ? data.salt : crypto.getRandomValues(new Uint8Array(16));
+    // const iv = data.hasOwnProperty('iv') ? data.iv : crypto.getRandomValues(new Uint8Array(12));
+
     const return_data = { iv: iv, salt: salt };
     const payload = utils.assemblePayload(return_data);
     const corsHeaders = {
@@ -228,15 +234,13 @@ async function handleStoreData(request, env) {
     const data = utils.extractPayload(val);
     console.log("EXTRACTED DATA IN MAIN: ", Object.keys(data))
     // const storageToken = data.storageToken;
-    if (!verifyStorage(data, image_id, env)) {
-      return returnResult(request, JSON.stringify({ error: 'Could not verify data' }), 200);
-    }
     let verification_token;
+
     const stored_data = await env.IMAGES_NAMESPACE.get(key, { type: "arrayBuffer" });
     if (stored_data == null) {
       verification_token = crypto.getRandomValues(new Uint16Array(4)).buffer;
       data['verification_token'] = verification_token;
-      const store_resp = await env.IMAGES_NAMESPACE.put(key, utils.assemblePayload(data));
+      await env.IMAGES_NAMESPACE.put(key, utils.assemblePayload(data));
       //console.log("Generated and stored verification token", store_resp);
     }
     else {
@@ -246,7 +250,12 @@ async function handleStoreData(request, env) {
     }
     console.log("Extracted data: ", data)
     const _storage_token = JSON.parse((new TextDecoder).decode(data.storageToken));
-    let _ledger_resp = JSON.parse(await env.LEDGER_NAMESPACE.get(_storage_token.token_hash))
+    let _ledger_resp = JSON.parse(await env.LEDGER_NAMESPACE.get(_storage_token.token_hash)).then( _L => { if (!_L) {  return returnResult(request, JSON.stringify({ error: "Authentication failure on storage ledger" }), 500)}});
+
+    if (!verifyStorage(data, image_id, env, _ledger_resp)) {
+      return returnResult(request, JSON.stringify({ error: 'Could not verify data' }), 200);
+    }
+
     _ledger_resp.used = true;
     let _put_resp = await env.LEDGER_NAMESPACE.put(_storage_token.token_hash, JSON.stringify(_ledger_resp));
     env.RECOVERY_NAMESPACE.put(_storage_token.hashed_room_id + '_' + _storage_token.encrypted_token_id, 'true');
@@ -286,13 +295,14 @@ async function handleFetchData(request, type, env) {
 }
 
 
-async function verifyStorage(data, id, env) {
+async function verifyStorage(data, id, env, _ledger_resp) {
   const dataHash = await generateDataHash(data.contents);
   if (id.slice(-dataHash.length) !== dataHash) {
     return false;
   }
-  const ledger_data = JSON.parse((new TextDecoder).decode(data.storageToken)) || {};
-  const token_hash = ledger_data.token_hash_buffer;;
+  // older design ... we think ...
+  // const ledger_data = JSON.parse((new TextDecoder()).decode(data.storageToken)) || {};
+  // const token_hash = ledger_data.token_hash_buffer;
   if (!_ledger_resp || _ledger_resp.used || _ledger_resp.size !== data.image.byteLength) {
     return false;
   }
@@ -343,7 +353,7 @@ async function handleMigrateStorage(request, env) {
     let targetURL = json['target'];
     console.log("TargetURL: ", targetURL)
     delete json['target'];
-    if (!json.hasOwnProperty('SERVER_SECRET') || !(json['SERVER_SECRET'] === env.SERVER_SECRET)) {
+    if (!Object.prototype.hasOwnProperty.call(json, 'SERVER_SECRET') || !(json['SERVER_SECRET'] === env.SERVER_SECRET)) { // yes you just need one '!'
       return returnResult(request, JSON.stringify({ error: "Server verification failed" }), 500)
     }
     delete json['SERVER_SECRET']
