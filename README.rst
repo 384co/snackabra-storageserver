@@ -10,7 +10,6 @@ Snackabra Storage Server
 For general documentation on Snackabra see:
 
 * https://snackabra.io
-* https://snackabra.github.org
 
 The storage server allows you to host and manage your own Snackabra
 objects (files, documents, etc), stored as (encrypted) blobs. This can
