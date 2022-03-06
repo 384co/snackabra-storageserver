@@ -153,18 +153,19 @@ Directory
 
 Following files should be present in this repository:
 
-
-    .
-    ├── LICENSE.md
-    ├── README.rst
-    ├── package.json
-    ├── setup
-    │   └── template.wrangler.toml
-    ├── snackabra.svg
-    └── src
-        ├── index.js
-        ├── package.json
-        └── utils.js
+::
+   
+  .
+  ├── LICENSE.md
+  ├── README.rst
+  ├── package.json
+  ├── setup
+  │   └── template.wrangler.toml
+  ├── snackabra.svg
+  └── src
+      ├── index.js
+      ├── package.json
+      └── utils.js
 
 
 LICENSE
