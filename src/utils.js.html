@@ -1,0 +1,177 @@
+<!-- Generator: GNU source-highlight 3.1.9
+by Lorenzo Bettini
+http://www.lorenzobettini.it
+http://www.gnu.org/software/src-highlite -->
+<pre><tt><i><font color="#9A1900">/* </font></i>
+<i><font color="#9A1900">   Copyright (C) 2019-2021 Magnusson Institute, All Rights Reserved</font></i>
+
+<i><font color="#9A1900">   "Snackabra" is a registered trademark</font></i>
+
+<i><font color="#9A1900">   This program is free software: you can redistribute it and/or</font></i>
+<i><font color="#9A1900">   modify it under the terms of the GNU Affero General Public License</font></i>
+<i><font color="#9A1900">   as published by the Free Software Foundation, either version 3 of</font></i>
+<i><font color="#9A1900">   the License, or (at your option) any later version.</font></i>
+
+<i><font color="#9A1900">   This program is distributed in the hope that it will be useful, but</font></i>
+<i><font color="#9A1900">   WITHOUT ANY WARRANTY; without even the implied warranty of</font></i>
+<i><font color="#9A1900">   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU</font></i>
+<i><font color="#9A1900">   Affero General Public License for more details.</font></i>
+
+<i><font color="#9A1900">   You should have received a copy of the GNU Affero General Public</font></i>
+<i><font color="#9A1900">   License along with this program.  If not, see www.gnu.org/licenses/</font></i>
+
+<i><font color="#9A1900">*/</font></i>
+
+
+<b><font color="#0000FF">function</font></b> <b><font color="#000000">assemblePayloadV1</font></b><font color="#990000">(</font>data<font color="#990000">)</font> <font color="#FF0000">{</font>
+  <b><font color="#0000FF">try</font></b> <font color="#FF0000">{</font>
+    let metadata <font color="#990000">=</font> <font color="#FF0000">{}</font>
+    <b><font color="#0000FF">for</font></b> <font color="#990000">(</font><b><font color="#0000FF">const</font></b> key <b><font color="#0000FF">in</font></b> data<font color="#990000">)</font> <font color="#FF0000">{</font>
+      metadata<font color="#990000">[</font>key<font color="#990000">]</font> <font color="#990000">=</font> data<font color="#990000">[</font>key<font color="#990000">].</font>byteLength<font color="#990000">;</font>
+    <font color="#FF0000">}</font>
+    let encoder <font color="#990000">=</font> <b><font color="#0000FF">new</font></b> <b><font color="#000000">TextEncoder</font></b><font color="#990000">();</font>
+    <b><font color="#0000FF">const</font></b> metadataBuffer <font color="#990000">=</font> encoder<font color="#990000">.</font><b><font color="#000000">encode</font></b><font color="#990000">(</font>JSON<font color="#990000">.</font><b><font color="#000000">stringify</font></b><font color="#990000">(</font>metadata<font color="#990000">));</font>
+    <b><font color="#0000FF">const</font></b> metadataSize <font color="#990000">=</font> <b><font color="#0000FF">new</font></b> <b><font color="#000000">Uint32Array</font></b><font color="#990000">([</font>metadataBuffer<font color="#990000">.</font>byteLength<font color="#990000">]);</font>
+    let payload <font color="#990000">=</font> <b><font color="#000000">_appendBuffer</font></b><font color="#990000">(</font>metadataSize<font color="#990000">.</font>buffer<font color="#990000">,</font> metadataBuffer<font color="#990000">);</font>
+    <b><font color="#0000FF">for</font></b> <font color="#990000">(</font><b><font color="#0000FF">const</font></b> key <b><font color="#0000FF">in</font></b> data<font color="#990000">)</font> <font color="#FF0000">{</font>
+      payload <font color="#990000">=</font> <b><font color="#000000">_appendBuffer</font></b><font color="#990000">(</font>payload<font color="#990000">,</font> data<font color="#990000">[</font>key<font color="#990000">]);</font>
+    <font color="#FF0000">}</font>
+    <b><font color="#0000FF">return</font></b> payload<font color="#990000">;</font>
+  <font color="#FF0000">}</font> <b><font color="#0000FF">catch</font></b> <font color="#990000">(</font>e<font color="#990000">)</font> <font color="#FF0000">{</font>
+    console<font color="#990000">.</font><b><font color="#000000">log</font></b><font color="#990000">(</font>e<font color="#990000">);</font>
+    <b><font color="#0000FF">return</font></b> <font color="#FF0000">{}</font><font color="#990000">;</font>
+  <font color="#FF0000">}</font>
+<font color="#FF0000">}</font>
+
+<b><font color="#0000FF">export</font></b> <b><font color="#0000FF">function</font></b> <b><font color="#000000">assemblePayload</font></b><font color="#990000">(</font>data<font color="#990000">)</font> <font color="#FF0000">{</font>
+  <b><font color="#0000FF">try</font></b> <font color="#FF0000">{</font>
+    let metadata <font color="#990000">=</font> <font color="#FF0000">{}</font>
+    metadata<font color="#990000">[</font><font color="#FF0000">"version"</font><font color="#990000">]</font> <font color="#990000">=</font> <font color="#FF0000">"002"</font><font color="#990000">;</font>
+    let keyCount <font color="#990000">=</font> <font color="#993399">0</font><font color="#990000">;</font>
+    let startIndex <font color="#990000">=</font> <font color="#993399">0</font><font color="#990000">;</font>
+    let _data <font color="#990000">=</font> <b><font color="#0000FF">new</font></b> <b><font color="#000000">ArrayBuffer</font></b><font color="#990000">();</font>
+    <b><font color="#0000FF">for</font></b> <font color="#990000">(</font><b><font color="#0000FF">const</font></b> key <b><font color="#0000FF">in</font></b> data<font color="#990000">)</font> <font color="#FF0000">{</font>
+      keyCount<font color="#990000">++;</font>
+      metadata<font color="#990000">[</font>keyCount<font color="#990000">.</font><b><font color="#000000">toString</font></b><font color="#990000">()]</font> <font color="#990000">=</font> <font color="#FF0000">{</font> name<font color="#990000">:</font> key<font color="#990000">,</font> start<font color="#990000">:</font> startIndex<font color="#990000">,</font> size<font color="#990000">:</font> data<font color="#990000">[</font>key<font color="#990000">].</font>byteLength<font color="#FF0000">}</font><font color="#990000">;</font>
+      startIndex <font color="#990000">+=</font> data<font color="#990000">[</font>key<font color="#990000">].</font>byteLength<font color="#990000">;</font>
+      _data <font color="#990000">=</font> <b><font color="#000000">_appendBuffer</font></b><font color="#990000">(</font>_data<font color="#990000">,</font> data<font color="#990000">[</font>key<font color="#990000">]);</font>
+    <font color="#FF0000">}</font>
+    console<font color="#990000">.</font><b><font color="#000000">log</font></b><font color="#990000">(</font><font color="#FF0000">"Metadata: "</font><font color="#990000">,</font> metadata<font color="#990000">);</font>
+    let encoder <font color="#990000">=</font> <b><font color="#0000FF">new</font></b> <b><font color="#000000">TextEncoder</font></b><font color="#990000">();</font>
+    <b><font color="#0000FF">const</font></b> metadataBuffer <font color="#990000">=</font> encoder<font color="#990000">.</font><b><font color="#000000">encode</font></b><font color="#990000">(</font>JSON<font color="#990000">.</font><b><font color="#000000">stringify</font></b><font color="#990000">(</font>metadata<font color="#990000">));</font>
+    <b><font color="#0000FF">const</font></b> metadataSize <font color="#990000">=</font> <b><font color="#0000FF">new</font></b> <b><font color="#000000">Uint32Array</font></b><font color="#990000">([</font>metadataBuffer<font color="#990000">.</font>byteLength<font color="#990000">]);</font>
+    let payload <font color="#990000">=</font> <b><font color="#000000">_appendBuffer</font></b><font color="#990000">(</font>metadataSize<font color="#990000">.</font>buffer<font color="#990000">,</font> metadataBuffer<font color="#990000">);</font>
+    payload <font color="#990000">=</font> <b><font color="#000000">_appendBuffer</font></b><font color="#990000">(</font>payload<font color="#990000">,</font> _data<font color="#990000">);</font>
+    <b><font color="#0000FF">return</font></b> payload<font color="#990000">;</font>
+  <font color="#FF0000">}</font> <b><font color="#0000FF">catch</font></b> <font color="#990000">(</font>e<font color="#990000">)</font> <font color="#FF0000">{</font>
+    console<font color="#990000">.</font><b><font color="#000000">log</font></b><font color="#990000">(</font>e<font color="#990000">);</font>
+    <b><font color="#0000FF">return</font></b> <font color="#FF0000">{}</font><font color="#990000">;</font>
+  <font color="#FF0000">}</font>
+<font color="#FF0000">}</font>
+
+
+<i><font color="#9A1900">// Version 001</font></i>
+<b><font color="#0000FF">function</font></b> <b><font color="#000000">extractPayloadV1</font></b><font color="#990000">(</font>payload<font color="#990000">)</font> <font color="#FF0000">{</font>
+  <b><font color="#0000FF">try</font></b> <font color="#FF0000">{</font>
+    <b><font color="#0000FF">const</font></b> metadataSize <font color="#990000">=</font> <b><font color="#0000FF">new</font></b> <b><font color="#000000">Uint32Array</font></b><font color="#990000">(</font>payload<font color="#990000">.</font><b><font color="#000000">slice</font></b><font color="#990000">(</font><font color="#993399">0</font><font color="#990000">,</font> <font color="#993399">4</font><font color="#990000">))[</font><font color="#993399">0</font><font color="#990000">];</font>
+    <b><font color="#0000FF">const</font></b> decoder <font color="#990000">=</font> <b><font color="#0000FF">new</font></b> <b><font color="#000000">TextDecoder</font></b><font color="#990000">();</font>
+    console<font color="#990000">.</font><b><font color="#000000">log</font></b><font color="#990000">(</font><font color="#FF0000">"METADATASIZE: "</font><font color="#990000">,</font> metadataSize<font color="#990000">)</font>
+    console<font color="#990000">.</font><b><font color="#000000">log</font></b><font color="#990000">(</font><font color="#FF0000">"METADATASTRING: "</font><font color="#990000">,</font> decoder<font color="#990000">.</font><b><font color="#000000">decode</font></b><font color="#990000">(</font>payload<font color="#990000">.</font><b><font color="#000000">slice</font></b><font color="#990000">(</font><font color="#993399">4</font><font color="#990000">,</font> <font color="#993399">4</font> <font color="#990000">+</font> metadataSize<font color="#990000">)))</font>
+    <b><font color="#0000FF">const</font></b> metadata <font color="#990000">=</font> JSON<font color="#990000">.</font><b><font color="#000000">parse</font></b><font color="#990000">(</font>decoder<font color="#990000">.</font><b><font color="#000000">decode</font></b><font color="#990000">(</font>payload<font color="#990000">.</font><b><font color="#000000">slice</font></b><font color="#990000">(</font><font color="#993399">4</font><font color="#990000">,</font> <font color="#993399">4</font> <font color="#990000">+</font> metadataSize<font color="#990000">)));</font>
+    console<font color="#990000">.</font><b><font color="#000000">log</font></b><font color="#990000">(</font><font color="#FF0000">"METADATA EXTRACTED"</font><font color="#990000">,</font> JSON<font color="#990000">.</font><b><font color="#000000">stringify</font></b><font color="#990000">(</font>metadata<font color="#990000">))</font>
+    let startIndex <font color="#990000">=</font> <font color="#993399">4</font> <font color="#990000">+</font> metadataSize<font color="#990000">;</font>
+    let data <font color="#990000">=</font> <font color="#FF0000">{}</font><font color="#990000">;</font>
+    <b><font color="#0000FF">for</font></b> <font color="#990000">(</font><b><font color="#0000FF">const</font></b> key <b><font color="#0000FF">in</font></b> metadata<font color="#990000">)</font> <font color="#FF0000">{</font>
+      data<font color="#990000">[</font>key<font color="#990000">]</font> <font color="#990000">=</font> payload<font color="#990000">.</font><b><font color="#000000">slice</font></b><font color="#990000">(</font>startIndex<font color="#990000">,</font> startIndex <font color="#990000">+</font> metadata<font color="#990000">[</font>key<font color="#990000">]);</font>
+      startIndex <font color="#990000">+=</font> metadata<font color="#990000">[</font>key<font color="#990000">];</font>
+    <font color="#FF0000">}</font>
+    <b><font color="#0000FF">return</font></b> data<font color="#990000">;</font>
+  <font color="#FF0000">}</font>
+  <b><font color="#0000FF">catch</font></b> <font color="#990000">(</font>e<font color="#990000">)</font> <font color="#FF0000">{</font>
+    console<font color="#990000">.</font><b><font color="#000000">log</font></b><font color="#990000">(</font><font color="#FF0000">"HIGH LEVEL ERROR"</font><font color="#990000">,</font> e<font color="#990000">.</font>message<font color="#990000">);</font>
+    <b><font color="#0000FF">return</font></b> <font color="#FF0000">{}</font><font color="#990000">;</font>
+  <font color="#FF0000">}</font>
+<font color="#FF0000">}</font>
+
+
+<b><font color="#0000FF">export</font></b> <b><font color="#0000FF">function</font></b> <b><font color="#000000">extractPayload</font></b><font color="#990000">(</font>payload<font color="#990000">)</font> <font color="#FF0000">{</font>
+  <b><font color="#0000FF">try</font></b> <font color="#FF0000">{</font>
+    <b><font color="#0000FF">const</font></b> metadataSize <font color="#990000">=</font> <b><font color="#0000FF">new</font></b> <b><font color="#000000">Uint32Array</font></b><font color="#990000">(</font>payload<font color="#990000">.</font><b><font color="#000000">slice</font></b><font color="#990000">(</font><font color="#993399">0</font><font color="#990000">,</font> <font color="#993399">4</font><font color="#990000">))[</font><font color="#993399">0</font><font color="#990000">];</font>
+    <b><font color="#0000FF">const</font></b> decoder <font color="#990000">=</font> <b><font color="#0000FF">new</font></b> <b><font color="#000000">TextDecoder</font></b><font color="#990000">();</font>
+    console<font color="#990000">.</font><b><font color="#000000">log</font></b><font color="#990000">(</font><font color="#FF0000">"METADATASIZE: "</font><font color="#990000">,</font> metadataSize<font color="#990000">)</font>
+    console<font color="#990000">.</font><b><font color="#000000">log</font></b><font color="#990000">(</font><font color="#FF0000">"METADATASTRING: "</font><font color="#990000">,</font> decoder<font color="#990000">.</font><b><font color="#000000">decode</font></b><font color="#990000">(</font>payload<font color="#990000">.</font><b><font color="#000000">slice</font></b><font color="#990000">(</font><font color="#993399">4</font><font color="#990000">,</font> <font color="#993399">4</font> <font color="#990000">+</font> metadataSize<font color="#990000">)))</font>
+    <b><font color="#0000FF">const</font></b> _metadata <font color="#990000">=</font> JSON<font color="#990000">.</font><b><font color="#000000">parse</font></b><font color="#990000">(</font>decoder<font color="#990000">.</font><b><font color="#000000">decode</font></b><font color="#990000">(</font>payload<font color="#990000">.</font><b><font color="#000000">slice</font></b><font color="#990000">(</font><font color="#993399">4</font><font color="#990000">,</font> <font color="#993399">4</font> <font color="#990000">+</font> metadataSize<font color="#990000">)));</font>
+    console<font color="#990000">.</font><b><font color="#000000">log</font></b><font color="#990000">(</font><font color="#FF0000">"METADATA EXTRACTED"</font><font color="#990000">,</font> JSON<font color="#990000">.</font><b><font color="#000000">stringify</font></b><font color="#990000">(</font>_metadata<font color="#990000">))</font>
+    let startIndex <font color="#990000">=</font> <font color="#993399">4</font> <font color="#990000">+</font> metadataSize<font color="#990000">;</font>
+    <b><font color="#0000FF">if</font></b> <font color="#990000">(!</font>_metadata<font color="#990000">.</font><b><font color="#000000">hasOwnProperty</font></b><font color="#990000">(</font><font color="#FF0000">"version"</font><font color="#990000">))</font> <font color="#FF0000">{</font>
+      _metadata<font color="#990000">[</font><font color="#FF0000">"version"</font><font color="#990000">]</font> <font color="#990000">=</font> <font color="#FF0000">"001"</font><font color="#990000">;</font>
+    <font color="#FF0000">}</font>
+    <b><font color="#0000FF">switch</font></b> <font color="#990000">(</font>_metadata<font color="#990000">[</font><font color="#FF0000">"version"</font><font color="#990000">])</font> <font color="#FF0000">{</font>
+      <b><font color="#0000FF">case</font></b> <font color="#FF0000">"001"</font><font color="#990000">:</font> 
+        <b><font color="#0000FF">return</font></b> <b><font color="#000000">extractPayloadV1</font></b><font color="#990000">(</font>payload<font color="#990000">);</font>
+      <b><font color="#0000FF">case</font></b> <font color="#FF0000">"002"</font><font color="#990000">:</font>
+        let data <font color="#990000">=</font> <font color="#FF0000">{}</font><font color="#990000">;</font>
+        <b><font color="#0000FF">for</font></b><font color="#990000">(</font>let i <font color="#990000">=</font> <font color="#993399">1</font><font color="#990000">;</font> i<font color="#990000">&lt;</font>Object<font color="#990000">.</font><b><font color="#000000">keys</font></b><font color="#990000">(</font>_metadata<font color="#990000">).</font>length<font color="#990000">;</font> i<font color="#990000">++)</font> <font color="#FF0000">{</font>
+          let _index <font color="#990000">=</font> i<font color="#990000">.</font><b><font color="#000000">toString</font></b><font color="#990000">();</font>
+          <b><font color="#0000FF">if</font></b> <font color="#990000">(</font>_metadata<font color="#990000">.</font><b><font color="#000000">hasOwnProperty</font></b><font color="#990000">(</font>_index<font color="#990000">))</font> <font color="#FF0000">{</font>
+            let propertyStartIndex <font color="#990000">=</font> _metadata<font color="#990000">[</font>_index<font color="#990000">][</font><font color="#FF0000">"start"</font><font color="#990000">]</font>
+            console<font color="#990000">.</font><b><font color="#000000">log</font></b><font color="#990000">(</font>propertyStartIndex<font color="#990000">);</font>
+            let size <font color="#990000">=</font> _metadata<font color="#990000">[</font>_index<font color="#990000">][</font><font color="#FF0000">"size"</font><font color="#990000">]</font>
+            data<font color="#990000">[</font>_metadata<font color="#990000">[</font>_index<font color="#990000">][</font><font color="#FF0000">"name"</font><font color="#990000">]]</font> <font color="#990000">=</font> payload<font color="#990000">.</font><b><font color="#000000">slice</font></b><font color="#990000">(</font>startIndex <font color="#990000">+</font> propertyStartIndex<font color="#990000">,</font> startIndex <font color="#990000">+</font> propertyStartIndex <font color="#990000">+</font> size<font color="#990000">);</font>
+          <font color="#FF0000">}</font>
+        <font color="#FF0000">}</font>
+        <b><font color="#0000FF">return</font></b> data<font color="#990000">;</font>
+    <font color="#FF0000">}</font>
+  <font color="#FF0000">}</font>
+  <b><font color="#0000FF">catch</font></b> <font color="#990000">(</font>e<font color="#990000">)</font> <font color="#FF0000">{</font>
+    console<font color="#990000">.</font><b><font color="#000000">log</font></b><font color="#990000">(</font><font color="#FF0000">"HIGH LEVEL ERROR"</font><font color="#990000">,</font> e<font color="#990000">.</font>message<font color="#990000">);</font>
+    <b><font color="#0000FF">return</font></b> <font color="#FF0000">{}</font><font color="#990000">;</font>
+  <font color="#FF0000">}</font>
+<font color="#FF0000">}</font>
+
+<b><font color="#0000FF">export</font></b> <b><font color="#0000FF">function</font></b> <b><font color="#000000">_appendBuffer</font></b><font color="#990000">(</font>buffer1<font color="#990000">,</font> buffer2<font color="#990000">)</font> <font color="#FF0000">{</font>
+  <b><font color="#0000FF">try</font></b> <font color="#FF0000">{</font>
+    <b><font color="#0000FF">var</font></b> tmp <font color="#990000">=</font> <b><font color="#0000FF">new</font></b> <b><font color="#000000">Uint8Array</font></b><font color="#990000">(</font>buffer1<font color="#990000">.</font>byteLength <font color="#990000">+</font> buffer2<font color="#990000">.</font>byteLength<font color="#990000">);</font>
+    tmp<font color="#990000">.</font><b><font color="#000000">set</font></b><font color="#990000">(</font><b><font color="#0000FF">new</font></b> <b><font color="#000000">Uint8Array</font></b><font color="#990000">(</font>buffer1<font color="#990000">),</font> <font color="#993399">0</font><font color="#990000">);</font>
+    tmp<font color="#990000">.</font><b><font color="#000000">set</font></b><font color="#990000">(</font><b><font color="#0000FF">new</font></b> <b><font color="#000000">Uint8Array</font></b><font color="#990000">(</font>buffer2<font color="#990000">),</font> buffer1<font color="#990000">.</font>byteLength<font color="#990000">);</font>
+    <b><font color="#0000FF">return</font></b> tmp<font color="#990000">.</font>buffer<font color="#990000">;</font>
+  <font color="#FF0000">}</font> <b><font color="#0000FF">catch</font></b> <font color="#990000">(</font>e<font color="#990000">)</font> <font color="#FF0000">{</font>
+    console<font color="#990000">.</font><b><font color="#000000">log</font></b><font color="#990000">(</font>e<font color="#990000">);</font>
+    <b><font color="#0000FF">return</font></b> <font color="#FF0000">{}</font><font color="#990000">;</font>
+  <font color="#FF0000">}</font>
+<font color="#FF0000">}</font><font color="#990000">;</font>
+
+
+<b><font color="#0000FF">export</font></b> <b><font color="#0000FF">function</font></b> <b><font color="#000000">arrayBufferToBase64</font></b><font color="#990000">(</font>buffer<font color="#990000">)</font> <font color="#FF0000">{</font>
+  <b><font color="#0000FF">try</font></b> <font color="#FF0000">{</font>
+    let binary <font color="#990000">=</font> <font color="#FF0000">''</font><font color="#990000">;</font>
+    <b><font color="#0000FF">const</font></b> bytes <font color="#990000">=</font> <b><font color="#0000FF">new</font></b> <b><font color="#000000">Uint8Array</font></b><font color="#990000">(</font>buffer<font color="#990000">);</font>
+    <b><font color="#0000FF">const</font></b> len <font color="#990000">=</font> bytes<font color="#990000">.</font>byteLength<font color="#990000">;</font>
+    <b><font color="#0000FF">for</font></b> <font color="#990000">(</font>let i <font color="#990000">=</font> <font color="#993399">0</font><font color="#990000">;</font> i <font color="#990000">&lt;</font> len<font color="#990000">;</font> i<font color="#990000">++)</font> <font color="#FF0000">{</font>
+      binary <font color="#990000">+=</font> String<font color="#990000">.</font><b><font color="#000000">fromCharCode</font></b><font color="#990000">(</font>bytes<font color="#990000">[</font>i<font color="#990000">]);</font>
+    <font color="#FF0000">}</font>
+    <b><font color="#0000FF">return</font></b> window<font color="#990000">.</font><b><font color="#000000">btoa</font></b><font color="#990000">(</font>binary<font color="#990000">);</font>
+  <font color="#FF0000">}</font>
+  <b><font color="#0000FF">catch</font></b> <font color="#990000">(</font>e<font color="#990000">)</font> <font color="#FF0000">{</font>
+    console<font color="#990000">.</font><b><font color="#000000">log</font></b><font color="#990000">(</font>e<font color="#990000">);</font>
+    <b><font color="#0000FF">return</font></b> <font color="#FF0000">{</font> error<font color="#990000">:</font> e <font color="#FF0000">}</font><font color="#990000">;</font>
+  <font color="#FF0000">}</font>
+<font color="#FF0000">}</font>
+
+
+<b><font color="#0000FF">export</font></b> <b><font color="#0000FF">function</font></b> <b><font color="#000000">base64ToArrayBuffer</font></b><font color="#990000">(</font>base64<font color="#990000">)</font> <font color="#FF0000">{</font>
+  <b><font color="#0000FF">try</font></b> <font color="#FF0000">{</font>
+    <b><font color="#0000FF">var</font></b> binary_string <font color="#990000">=</font> window<font color="#990000">.</font><b><font color="#000000">atob</font></b><font color="#990000">(</font>base64<font color="#990000">);</font>
+    <b><font color="#0000FF">var</font></b> len <font color="#990000">=</font> binary_string<font color="#990000">.</font>length<font color="#990000">;</font>
+    <b><font color="#0000FF">var</font></b> bytes <font color="#990000">=</font> <b><font color="#0000FF">new</font></b> <b><font color="#000000">Uint8Array</font></b><font color="#990000">(</font>len<font color="#990000">);</font>
+    <b><font color="#0000FF">for</font></b> <font color="#990000">(</font><b><font color="#0000FF">var</font></b> i <font color="#990000">=</font> <font color="#993399">0</font><font color="#990000">;</font> i <font color="#990000">&lt;</font> len<font color="#990000">;</font> i<font color="#990000">++)</font> <font color="#FF0000">{</font>
+      bytes<font color="#990000">[</font>i<font color="#990000">]</font> <font color="#990000">=</font> binary_string<font color="#990000">.</font><b><font color="#000000">charCodeAt</font></b><font color="#990000">(</font>i<font color="#990000">);</font>
+    <font color="#FF0000">}</font>
+    <b><font color="#0000FF">return</font></b> bytes<font color="#990000">.</font>buffer<font color="#990000">;</font>
+  <font color="#FF0000">}</font>
+  <b><font color="#0000FF">catch</font></b> <font color="#990000">(</font>e<font color="#990000">)</font> <font color="#FF0000">{</font>
+    console<font color="#990000">.</font><b><font color="#000000">log</font></b><font color="#990000">(</font>e<font color="#990000">);</font>
+    <b><font color="#0000FF">return</font></b> <font color="#FF0000">{</font> error<font color="#990000">:</font> e <font color="#FF0000">}</font><font color="#990000">;</font>
+  <font color="#FF0000">}</font>
+<font color="#FF0000">}</font>
+</tt></pre>

@@ -129,66 +129,13 @@ async function handleApiCall(request, env) {
 }
 
 function handleDevelopmentMode() {
-
-  const html = `<!doctypehtml> <html> <body> <div style="display: block; font-weight: bold; padding: 5%; margin: auto; font-family: countach,sans-serif; line-height: 1; margin: 0;"> <h1 style="text-align: center;"> This feature is currently under development. Stay tuned! </h3> </div> </body> </html>
-  `
+  const html = `<!doctypehtml> <html> <body> <div style="display: block; font-weight: bold; padding: 5%; margin: auto; font-family: countach,sans-serif; line-height: 1; margin: 0;"> <h1 style="text-align: center;"> This feature is currently under development. Stay tuned! </h3> </div> </body> </html>`
   return new Response(html, {
     headers: {
       "content-type": "text/html;charset=UTF-8",
     },
   })
 }
-
-// async function verifyCookie(request, env) {
-
-//   // Parse cookie code from https://stackoverflow.com/questions/51812422/node-js-how-can-i-get-cookie-value-by-cookie-name-from-request
-//   try {
-//     console.log("In verify cookie")
-//     let cookies = {};
-//     const { searchParams } = new URL(request.url);
-//     const room_id = searchParams.get('roomId');
-//     request.headers.has('cookie') && request.headers.get('cookie').split(';').forEach(function (cookie) {
-//       let parts = cookie.match(/(.*?)=(.*)$/)
-//       cookies[parts[1].trim()] = (parts[2] || '').trim();
-//     });
-//     if (!cookies.hasOwnProperty('token_' + room_id)) {
-//       return false;
-//     }
-//     console.log(cookies);
-//     const verificationKey = await crypto.subtle.importKey("jwk", JSON.parse(await env.KEYS_NAMESPACE.get(room_id + '_authorizationKey')), { name: "ECDSA", namedCurve: "P-384" }, false, ["verify"]);
-//     const auth_parts = cookies['token_' + room_id].split('.');
-//     const payload = auth_parts[0];
-//     const sign = auth_parts[1];
-//     //console.log(payload, sign);
-//     return (await verifySign(verificationKey, sign, payload + '_' + room_id) && ((new Date()).getTime() - parseInt(payload)) < 86400000);
-//   } catch (error) {
-//     return false;
-//   }
-// }
-
-
-
-// async function verifySign(secretKey, sign, contents) {
-//   try {
-//     const _sign = utils.base64ToArrayBuffer(decodeURIComponent(sign));
-//     const encoder = new TextEncoder();
-//     const encoded = encoder.encode(contents);
-//     //console.log(secretKey, _sign, encoded)
-//     let verified = await crypto.subtle.verify(
-//       { name: 'ECDSA', hash: 'SHA-256' },
-//       secretKey,
-//       _sign,
-//       encoded
-//     );
-//     //console.log("TRUE");
-//     return verified;
-//   } catch (e) {
-//     console.log(e)
-//     //console.log("FALSE");
-//     return false;
-//   }
-// }
-
 
 async function handleStoreRequest(request, env) {
   try {

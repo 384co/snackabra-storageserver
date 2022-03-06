@@ -1,9 +1,12 @@
 {
-  "private": true,
   "name": "worker",
-  "version": "1.0.0",
-  "description": "",
+  "author": "Magnusson Institute",
+  "description": "Snackabra storage server",
+  "email" : "snackabra@gmail.com",
+  "bugs": "https://github.com/snackabra/snackabra-storageserver/issues",
+  "homepage": "https://snackabra.io",
+  "version": "0.4.2",
   "main": "index.js",
-  "author": "",
-  "license": "MIT"
+  "license": "GPL-3.0-only",
+  "private": false
 }
