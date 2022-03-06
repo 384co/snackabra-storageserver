@@ -151,7 +151,8 @@ server with e.g. levelup (https://github.com/Level/levelup).
 Directory
 ---------
 
-Following files should be present:
+Following files should be present in this repository:
+
 
     .
     ├── LICENSE.md
