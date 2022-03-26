@@ -63,7 +63,7 @@ when any nameservers have propagated.
 Next set up the CF command line environment, the "Wrangler CLI", we
 use "yarn" in general but the personal server code is pure JS and
 (currently) does not need any node packages. Follow instructions at
-https://dash.cloudflare.com/6a24dd354a78c1e313b1b8054d75e506/workers/cli -
+https://developers.cloudflare.com/workers/cli-wrangler/ -
 at time of writing:
 
 ::
@@ -75,7 +75,7 @@ at time of writing:
    wrangler login
 
    # copy the template 'toml' file
-   cp setup/template.wranger.toml wrangler.toml
+   cp setup/template.wrangler.toml wrangler.toml
 
 
 The 'login' will open a web page to confirm that your CLI is allowed
@@ -125,8 +125,7 @@ CF Durable Objects are not yet supported in preview mode.)
 
 
 
-(**) At time of writing, the link was:
-https://dash.cloudflare.com/6a24dd354a78c1e313b1b8054d75e506/workers/overview?enable-durable-objects
+Log into the Cloudflare dashboard > Workers > Durable Objects
 
     
 
