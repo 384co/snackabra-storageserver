@@ -32,7 +32,7 @@ kv_namespaces = [
 [build.upload]
 format = "modules"
 dir = "src"
-main = "index.js"
+main = "storage.js"
 
 [[build.upload.rules]]
 type = "ESModule"
