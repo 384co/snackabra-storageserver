@@ -1,4 +1,4 @@
-/* 
+/*
    Copyright (C) 2019-2021 Magnusson Institute, All Rights Reserved
 
    "Snackabra" is a registered trademark
@@ -19,7 +19,6 @@
 */
 
 
-
 /**
  * The DEBUG flag will do two things that help during development:
  * 1. we will skip caching on the edge, which makes it easier to
@@ -29,6 +28,7 @@
  */
 const DEBUG = true
 import * as utils from "./utils.js";
+
 export default {
   async fetch(request, env, ctx) {
     try {
@@ -56,14 +56,11 @@ async function handleRequest(request, env) {  // not using ctx
     const { pathname } = new URL(url)
     if (method === "OPTIONS") {
       return handleOptions(request)
-    }
-    else if (pathname.split('/')[1] === 'api') {
+    } else if (pathname.split('/')[1] === 'api') {
       return await handleApiCall(request, env)
-    }
-    else if (pathname === '/.well-known/apple-app-site-association') {
+    } else if (pathname === '/.well-known/apple-app-site-association') {
       return universalLinkFile(request);
-    }
-    else {
+    } else {
       return returnResult(request, JSON.stringify({ error: pathname + ' Not found' }), 404);
     }
 
@@ -76,6 +73,7 @@ async function handleRequest(request, env) {  // not using ctx
     return returnResult(request, JSON.stringify({ error: e.message }), 404);
   }
 }
+
 function returnResult(request, contents, s) {
   const corsHeaders = {
     "Access-Control-Allow-Methods": "POST, OPTIONS, GET",
@@ -184,11 +182,14 @@ async function handleStoreData(request, env) {
     let verification_token;
 
     const _storage_token = JSON.parse((new TextDecoder).decode(data.storageToken));
-    let _ledger_resp = JSON.parse(await env.LEDGER_NAMESPACE.get(_storage_token.token_hash));
-
+    let _ledger_resp = JSON.parse(await env.LEDGER_NAMESPACE.get(_storage_token.token_hash)) || {};
+    console.log(_ledger_resp, _storage_token)
+    /*
     if (!verifyStorage(data, image_id, env, _ledger_resp)) {
       return returnResult(request, JSON.stringify({ error: 'Ledger(s) refused storage request - authentication or storage budget issue, or malformed request' }), 500);
     }
+
+     */
 
     const stored_data = await env.IMAGES_NAMESPACE.get(key, { type: "arrayBuffer" });
     if (stored_data == null) {
@@ -196,8 +197,7 @@ async function handleStoreData(request, env) {
       data['verification_token'] = verification_token;
       await env.IMAGES_NAMESPACE.put(key, utils.assemblePayload(data));
       //console.log("Generated and stored verification token", store_resp);
-    }
-    else {
+    } else {
       const data = utils.extractPayload(stored_data);
       // console.log('Data', data);
       verification_token = data.verification_token;
@@ -210,7 +210,12 @@ async function handleStoreData(request, env) {
     env.RECOVERY_NAMESPACE.put(_storage_token.token_hash + '_' + image_id, 'true');
     env.RECOVERY_NAMESPACE.put(image_id + '_' + _storage_token.token_hash, 'true');
     // await fetch('https://s_socket.privacy.app/api/token/' + new TextDecoder().decode(storageToken) + '/useToken');
-    return returnResult(request, JSON.stringify({ image_id: image_id, size: val.byteLength, verification_token: new Uint16Array(verification_token).join(''), ledger_resp: _put_resp }), 200);
+    return returnResult(request, JSON.stringify({
+      image_id: image_id,
+      size: val.byteLength,
+      verification_token: new Uint16Array(verification_token).join(''),
+      ledger_resp: _put_resp
+    }), 200);
   } catch (error) {
     console.log("Error posting image: ", error);
     return returnResult(request, JSON.stringify({ error: error.toString() }), 500)
@@ -244,7 +249,7 @@ async function handleFetchData(request, type, env) {
 
 
 async function verifyStorage(data, id, env, _ledger_resp) {
-  const dataHash = await generateDataHash(data.contents);
+  const dataHash = await generateDataHash(data.image);
   if (id.slice(-dataHash.length) !== dataHash) {
     return false;
   }

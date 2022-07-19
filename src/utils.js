@@ -1,4 +1,4 @@
-/* 
+/*
    Copyright (C) 2019-2021 Magnusson Institute, All Rights Reserved
 
    "Snackabra" is a registered trademark
@@ -103,7 +103,7 @@ export function extractPayload(payload) {
       _metadata["version"] = "001";
     }
     switch (_metadata["version"]) {
-      case "001": 
+      case "001":
         return extractPayloadV1(payload);
       case "002":
         let data = {};
@@ -146,7 +146,7 @@ export function arrayBufferToBase64(buffer) {
     for (let i = 0; i < len; i++) {
       binary += String.fromCharCode(bytes[i]);
     }
-    return window.btoa(binary);
+    return btoa(binary);
   }
   catch (e) {
     console.log(e);
@@ -157,7 +157,7 @@ export function arrayBufferToBase64(buffer) {
 
 export function base64ToArrayBuffer(base64) {
   try {
-    var binary_string = window.atob(base64);
+    var binary_string = atob(base64);
     var len = binary_string.length;
     var bytes = new Uint8Array(len);
     for (var i = 0; i < len; i++) {
