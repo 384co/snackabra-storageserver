@@ -9,8 +9,12 @@
   "homepage": "https://snackabra.io",
   "license": "GPL-3.0-only",
   "private": false,
+  "scripts": {
+    "miniflare" : "miniflare src/storage.js --watch --debug --modules --port 4000 --wrangler-config wrangler.toml"
+  },
   "devDependencies": {
     "eslint": "^8.8.0",
-    "eslint-plugin-react": "^7.28.0"
+    "eslint-plugin-react": "^7.28.0",
+    "miniflare": "^2.6.0"
   }
 }
