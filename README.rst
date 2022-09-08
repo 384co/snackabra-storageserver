@@ -39,6 +39,9 @@ The current room server requires a domain name and a Cloudflare (CF)
 account. Currently, a free CF account is _almost_ sufficient, but
 "Worker KV" needs a paid-per-use add-on (*).
 
+<details>
+<summary><h2>Click for Details</h2></summary>
+
 If you haven't already done so, you might want to set up your personal
 room server first
 (https://github.com/snackabra/snackabra-roomserver). If you have,
@@ -123,15 +126,52 @@ Now you should be able to start your server:
 And point a client to it. (Note: you currently cannot run ``wrangler dev``, because
 CF Durable Objects are not yet supported in preview mode.)
 
-
-
 Log into the Cloudflare dashboard > Workers > Durable Objects
 
+</details>
+
+
     
+Setup (Docker)
+--------------
+
+You can run all the servers on pre-configured docker containers if you would like, see:
+
+https://github.com/snackabra/snackabra-self-managed
+
+
+    
+Setup (Development)
+-------------------
+
+If you are developing locally, we suggest https://miniflare.dev/
+
+<details>
+<summary><h2>Click for Details</h2></summary>
+
+Setup is similar as above:
+
+```
+# copy the template 'toml' file for miniflare
+cp setup/miniflare.wrangler.toml wrangler.toml
+```
+
+The only thing you need to change is the "LEDGER_KEY" (to the generated public key).
+
+Then setup packages and run:
+
+```
+npm install
+npm run miniflare
+```
+
+It should fire up on ```http://127.0.0.1:4000```
+
+</details>
+
 
 Notes
 -----
-
 
 The server is currently oriented towards running on Cloudflare (CF)
 workers using key-value (KV) store; the CF free level supports only up
