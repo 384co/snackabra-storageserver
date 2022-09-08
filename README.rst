@@ -146,9 +146,6 @@ Setup (Development)
 
 If you are developing locally, we suggest https://miniflare.dev/
 
-<details>
-<summary><h2>Click for Details</h2></summary>
-
 Setup is similar as above:
 
 ```
@@ -166,8 +163,6 @@ npm run miniflare
 ```
 
 It should fire up on ```http://127.0.0.1:4000```
-
-</details>
 
 
 Notes
