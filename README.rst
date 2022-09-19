@@ -77,7 +77,7 @@ at time of writing:
    # authenticate your CLI:
    wrangler login
 
-   # copy the template 'toml' file
+   # copy the template toml file
    cp setup/template.wrangler.toml wrangler.toml
 
 
@@ -104,7 +104,7 @@ in addition to what's shared with the room server:
    wrangler kv:namespace create "RECOVERY_NAMESPACE"
 
 For each of them, you need to copy-paste the corresponding 'id' to
-your ```wrangler.toml``` file.
+your ``wrangler.toml`` file.
 
 Finally, you need to make a tiny change to your copy of
 the server code, providing a 'secret'. This is essentially a simple
@@ -126,7 +126,7 @@ Now you should be able to start your server:
 And point a client to it. (Note: you currently cannot run ``wrangler dev``, because
 CF Durable Objects are not yet supported in preview mode.)
 
-Log into the Cloudflare dashboard > Workers > Durable Objects
+Log into the Cloudflare ``dashboard > Workers > Durable Objects``
 
 </details>
 
@@ -148,21 +148,21 @@ If you are developing locally, we suggest https://miniflare.dev/
 
 Setup is similar as above:
 
-```
-# copy the template 'toml' file for miniflare
-cp setup/miniflare.wrangler.toml wrangler.toml
-```
+::
+
+   # copy the template 'toml' file for miniflare
+   cp setup/miniflare.wrangler.toml wrangler.toml
 
 The only thing you need to change is the "LEDGER_KEY" (to the generated public key).
 
 Then setup packages and run:
 
-```
-npm install
-npm run miniflare
-```
+::
 
-It should fire up on ```http://127.0.0.1:4000```
+   npm install
+   npm run miniflare
+
+It should fire up on ``http://127.0.0.1:4000``
 
 
 Notes
