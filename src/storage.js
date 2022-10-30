@@ -31,6 +31,8 @@ import * as utils from "./utils.js";
 
 export default {
   async fetch(request, env, ctx) {
+    // console.log("Origin:")
+    // console.log(request.headers.get("Origin"))
     try {
       return await handleRequest(request, env, ctx);
     } catch (e) {
@@ -43,8 +45,8 @@ export default {
 }
 
 async function handleRequest(request, env) {  // not using ctx
-
   try {
+    // console.log(request)
     let options = {}
     if (DEBUG) {
       // customize caching
@@ -63,13 +65,11 @@ async function handleRequest(request, env) {  // not using ctx
     } else {
       return returnResult(request, JSON.stringify({ error: pathname + ' Not found' }), 404);
     }
-
   } catch (e) {
     // if an error is thrown try to serve the asset at 404.html
     if (!DEBUG) {
       return returnResult(request, JSON.stringify({ error: 'Not found' }), 404);
     }
-
     return returnResult(request, JSON.stringify({ error: e.message }), 404);
   }
 }
@@ -81,7 +81,9 @@ function returnResult(request, contents, s) {
     'Content-Type': 'application/json;',
     "Access-Control-Allow-Origin": request.headers.get("Origin")
   }
-  return new Response(contents, { status: s, headers: corsHeaders });
+  const r = new Response(contents, { status: s, headers: corsHeaders });
+  // console.log("returnResult:"); console.log(r)
+  return r
 }
 
 function handleOptions(request) {
@@ -109,7 +111,8 @@ async function handleApiCall(request, env) {
       case 'storeData':
         return await handleStoreData(request, env)
       case 'fetchData':
-        return await handleFetchData(request, "p", env)
+        // psm ... for fuck's sake it's hardcoded to 'p' ... sigh
+        return await handleFetchData(request, env)
       case 'migrateStorage':
         return await handleMigrateStorage(request, env)
       case 'fetchDataMigration':
@@ -153,6 +156,8 @@ async function handleStoreRequest(request, env) {
     // const iv = data.hasOwnProperty('iv') ? data.iv : crypto.getRandomValues(new Uint8Array(12));
 
     const return_data = { iv: iv, salt: salt };
+    console.log('handleStoreRequest returning:')
+    console.log(return_data)
     const payload = utils.assemblePayload(return_data);
     const corsHeaders = {
       "Access-Control-Allow-Methods": "POST, OPTIONS, GET",
@@ -167,13 +172,19 @@ async function handleStoreRequest(request, env) {
   }
 }
 
+function genKey(type, id) {
+  const key = "____" + type + "__" + id + "______"
+  // console.log(`genKey(): '${key}'`)
+  return key
+}
+
 async function handleStoreData(request, env) {
   try {
     const { searchParams } = new URL(request.url);
-    const image_id = searchParams.get('key');
+    const image_id = searchParams.get('key')
     // console.log(image_id)
-    const type = searchParams.get('type');
-    const key = "____" + type + "__" + image_id + "______";
+    const type = searchParams.get('type')
+    const key = genKey(type, image_id)
     // console.log(key, await IMAGES_NAMESPACE.get(key))
     const val = await request.arrayBuffer();
     const data = utils.extractPayload(val);
@@ -181,40 +192,51 @@ async function handleStoreData(request, env) {
     // const storageToken = data.storageToken;
     let verification_token;
 
+    console.log("storageToken:")
+    console.log(data.storageToken)
     const _storage_token = JSON.parse((new TextDecoder).decode(data.storageToken));
     let _ledger_resp = JSON.parse(await env.LEDGER_NAMESPACE.get(_storage_token.token_hash)) || {};
     console.log(_ledger_resp, _storage_token)
-    /*
-    if (!verifyStorage(data, image_id, env, _ledger_resp)) {
+    /* if (!verifyStorage(data, image_id, env, _ledger_resp)) {
       return returnResult(request, JSON.stringify({ error: 'Ledger(s) refused storage request - authentication or storage budget issue, or malformed request' }), 500);
-    }
-
-     */
-
+    } */
     const stored_data = await env.IMAGES_NAMESPACE.get(key, { type: "arrayBuffer" });
     if (stored_data == null) {
+      console.log("======== data was new")
       verification_token = crypto.getRandomValues(new Uint16Array(4)).buffer;
       data['verification_token'] = verification_token;
-      await env.IMAGES_NAMESPACE.put(key, utils.assemblePayload(data));
-      //console.log("Generated and stored verification token", store_resp);
+      const assembled_data = utils.assemblePayload(data)
+      console.log("assembled data")
+      console.log(assembled_data)
+      await env.IMAGES_NAMESPACE.put(key, assembled_data);
+      console.log("Generated and stored verification token:" /*, store_resp */) // wait there is no "store_resp"?
+      console.log(verification_token)
     } else {
+      console.log("======== data was deduplicated")
       const data = utils.extractPayload(stored_data);
-      // console.log('Data', data);
+      console.log(data)
+      console.log("found verification token:")
+      console.log(data.verification_token)
       verification_token = data.verification_token;
     }
-    console.log("Extracted data: ", data)
-
-    _ledger_resp.used = true;
-    let _put_resp = await env.LEDGER_NAMESPACE.put(_storage_token.token_hash, JSON.stringify(_ledger_resp));
-    env.RECOVERY_NAMESPACE.put(_storage_token.hashed_room_id + '_' + _storage_token.encrypted_token_id, 'true');
-    env.RECOVERY_NAMESPACE.put(_storage_token.token_hash + '_' + image_id, 'true');
-    env.RECOVERY_NAMESPACE.put(image_id + '_' + _storage_token.token_hash, 'true');
+    // console.log("Extracted data: ", data)
+    // TODO - disabling this for now, IMPORTANT to sort out storage token consumption
+    //        this code consumes the token to stop double use
+    // _ledger_resp.used = true;
+    // let _put_resp = await env.LEDGER_NAMESPACE.put(_storage_token.token_hash, JSON.stringify(_ledger_resp));
+    // env.RECOVERY_NAMESPACE.put(_storage_token.hashed_room_id + '_' + _storage_token.encrypted_token_id, 'true');
+    // env.RECOVERY_NAMESPACE.put(_storage_token.token_hash + '_' + image_id, 'true');
+    // env.RECOVERY_NAMESPACE.put(image_id + '_' + _storage_token.token_hash, 'true');
     // await fetch('https://s_socket.privacy.app/api/token/' + new TextDecoder().decode(storageToken) + '/useToken');
+    
+    const verification_token_string = new Uint16Array(verification_token).join('')
+    console.log("verification token string:")
+    console.log(verification_token_string)
     return returnResult(request, JSON.stringify({
       image_id: image_id,
       size: val.byteLength,
-      verification_token: new Uint16Array(verification_token).join(''),
-      ledger_resp: _put_resp
+      verification_token: verification_token_string,
+      // ledger_resp: _put_resp  // TODO: see above
     }), 200);
   } catch (error) {
     console.log("Error posting image: ", error);
@@ -222,30 +244,63 @@ async function handleStoreData(request, env) {
   }
 }
 
-async function handleFetchData(request, type, env) {
+// delays the call by 't' milliseconds
+function delay(t, v) {
+  return new Promise(resolve => setTimeout(resolve, t, v))
+}
+
+async function handleFetchData(request, env) {
   try {
-    const { searchParams } = new URL(request.url);
-    const verification_token = searchParams.get('verification_token');
+    console.log("handleFetchData()")
+    // console.log(request)
+    const { searchParams } = new URL(request.url)
+    console.log("searchParams:")
+    console.log(searchParams)
+    const verification_token = searchParams.get('verification_token')
+    console.log("verification_token:")
+    console.log(verification_token)
+    let type = searchParams.get('type')
+    console.log("====== found type")
+    console.log(type)
+    if (!type) type = 'p' // psm: fix to *default* not enforced
     // const storage_token = searchParams.get('storage_token');
     const id = searchParams.get('id');
-    const key = "____" + type + "__" + id + "______";
-    const stored_data = await env.IMAGES_NAMESPACE.get(key, { type: "arrayBuffer" });
-    console.log("Stored data", stored_data)
-    const data = utils.extractPayload(stored_data);
-    // const storage_resp = await (await fetch('https://s_socket.privacy.app/api/token/' + storage_token + '/checkUsage')).json();
-    if (verification_token !== new Uint16Array(data.verification_token).join('')) {
-      return returnResult(request, JSON.stringify({ error: 'Verification failed' }), 200);
+    const key = genKey(type, id)
+    console.log("looking up:")
+    console.log(key)
+    const stored_data = await env.IMAGES_NAMESPACE.get(key, { type: "arrayBuffer" })
+    if (!stored_data) {
+      console.log("object not found (error?)")
+      // TODO: add capabilities to delay responses
+      return returnResult(request, JSON.stringify({ error: 'cannot find object' }))
+    } else {
+      console.log("Stored data")
+      console.log(stored_data)
+      const data = utils.extractPayload(stored_data)
+      console.log("Parsed stored:")
+      console.log(data)
+      // const storage_resp = await (await fetch('https://s_socket.privacy.app/api/token/' + storage_token + '/checkUsage')).json();
+      console.log(data.verification_token)
+      const stored_verification_token = new Uint16Array(data.verification_token).join('')
+      if (verification_token !== stored_verification_token) {
+        console.log("received:")
+        console.log(verification_token)
+        console.log("expected:")
+        console.log(stored_verification_token)
+        return returnResult(request, JSON.stringify({ error: 'Verification failed' }), 200);
+      }
+      const corsHeaders = {
+        "Access-Control-Allow-Methods": "POST, OPTIONS, GET",
+        "Access-Control-Allow-Headers": "Content-Type",
+        "Access-Control-Allow-Origin": request.headers.get("Origin")
+      }
+      return new Response(utils.assemblePayload(data), { status: 200, headers: corsHeaders })
     }
-    const corsHeaders = {
-      "Access-Control-Allow-Methods": "POST, OPTIONS, GET",
-      "Access-Control-Allow-Headers": "Content-Type",
-      "Access-Control-Allow-Origin": request.headers.get("Origin")
-    }
-    return new Response(utils.assemblePayload(data), { status: 200, headers: corsHeaders });
   } catch (error) {
     return returnResult(request, JSON.stringify({ error: error.toString() }), 500)
   }
 }
+
 
 
 async function verifyStorage(data, id, env, _ledger_resp) {
@@ -325,7 +380,7 @@ async function handleMigrateStorage(request, env) {
         fetch_req = await fetch(reqUrl);
       }
       let ab = await fetch_req.arrayBuffer();
-      const kv_key = "____" + type + "__" + key_id + "______";
+      const kv_key = genKey(type, key_id)
       env.IMAGES_NAMESPACE.put(kv_key, ab);
     }
     return returnResult(request, JSON.stringify({ success: true }), 200)
@@ -342,7 +397,7 @@ async function handleFetchDataMigration(request, env) {
     // const storage_token = searchParams.get('storage_token');
     const id = searchParams.get('id');
     const type = searchParams.get('type')
-    const key = "____" + type + "__" + id + "______";
+    const key = genKey(type, id)
     const stored_data = await env.IMAGES_NAMESPACE.get(key, { type: "arrayBuffer" });
     console.log("Stored data", stored_data)
     if (stored_data == null) {
