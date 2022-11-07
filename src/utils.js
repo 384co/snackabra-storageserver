@@ -84,7 +84,8 @@ function extractPayloadV1(payload) {
     return data;
   }
   catch (e) {
-    console.log("HIGH LEVEL ERROR", e.message);
+    console.error("HIGH LEVEL ERROR", e.message);
+    console.trace()
     return {};
   }
 }
@@ -111,16 +112,19 @@ export function extractPayload(payload) {
           let _index = i.toString();
           if (_metadata.hasOwnProperty(_index)) {
             let propertyStartIndex = _metadata[_index]["start"]
-            console.log(propertyStartIndex);
+            // console.log(propertyStartIndex);
             let size = _metadata[_index]["size"]
             data[_metadata[_index]["name"]] = payload.slice(startIndex + propertyStartIndex, startIndex + propertyStartIndex + size);
           }
         }
+        console.log("========== extractPayload:")
+        console.log(data)
         return data;
     }
   }
   catch (e) {
-    console.log("HIGH LEVEL ERROR", e.message);
+    console.error("HIGH LEVEL ERROR", e.message);
+    console.trace()
     return {};
   }
 }
