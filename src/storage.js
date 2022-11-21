@@ -140,15 +140,25 @@ function handleDevelopmentMode() {
 
 async function handleStoreRequest(request, env) {
   try {
+    console.log("handleStoreRequest()")
     const { searchParams } = new URL(request.url);
     const name = searchParams.get('name');
-    const list_resp = await env.IMAGES_NAMESPACE.list({ 'prefix': name });
+    const type = searchParams.get('type');
+    if (!type) return returnResult(request, JSON.stringify({ error: "ERROR: you need type (note: old client bug)" }), 500)
+    console.log(`prefix name: ${genKey(type, name)}`)
+    // psm ugh: this never did genKey!  it never returned correct salt/iv
+    const list_resp = await env.IMAGES_NAMESPACE.list({ 'prefix':  genKey(type, name)});
     let data = {};
     if (list_resp.keys.length > 0) {
+      console.log("found object")
       const key = list_resp.keys[0].name;
       const val = await env.IMAGES_NAMESPACE.get(key, { type: "arrayBuffer" });
       data = utils.extractPayload(val);
+    } else {
+      console.log("did NOT find object")
     }
+    console.log("got blob data:")
+    console.log(data)
     const salt = Object.prototype.hasOwnProperty.call(data, 'salt') ? data.salt : crypto.getRandomValues(new Uint8Array(16));
     const iv = Object.prototype.hasOwnProperty.call(data, 'iv') ? data.iv : crypto.getRandomValues(new Uint8Array(12));
     // subtle not doing this:
@@ -192,11 +202,11 @@ async function handleStoreData(request, env) {
     // const storageToken = data.storageToken;
     let verification_token;
 
-    console.log("storageToken:")
-    console.log(data.storageToken)
+    // console.log("storageToken:")
+    // console.log(data.storageToken)
     const _storage_token = JSON.parse((new TextDecoder).decode(data.storageToken));
     let _ledger_resp = JSON.parse(await env.LEDGER_NAMESPACE.get(_storage_token.token_hash)) || {};
-    console.log(_ledger_resp, _storage_token)
+    // console.log(_ledger_resp, _storage_token)
     /* if (!verifyStorage(data, image_id, env, _ledger_resp)) {
       return returnResult(request, JSON.stringify({ error: 'Ledger(s) refused storage request - authentication or storage budget issue, or malformed request' }), 500);
     } */
@@ -209,14 +219,14 @@ async function handleStoreData(request, env) {
       console.log("assembled data")
       console.log(assembled_data)
       await env.IMAGES_NAMESPACE.put(key, assembled_data);
-      console.log("Generated and stored verification token:" /*, store_resp */) // wait there is no "store_resp"?
-      console.log(verification_token)
+      // console.log("Generated and stored verification token:" /*, store_resp */) // wait there is no "store_resp"?
+      // console.log(verification_token)
     } else {
       console.log("======== data was deduplicated")
       const data = utils.extractPayload(stored_data);
       console.log(data)
-      console.log("found verification token:")
-      console.log(data.verification_token)
+      // console.log("found verification token:")
+      // console.log(data.verification_token)
       verification_token = data.verification_token;
     }
     // console.log("Extracted data: ", data)
@@ -230,8 +240,8 @@ async function handleStoreData(request, env) {
     // await fetch('https://s_socket.privacy.app/api/token/' + new TextDecoder().decode(storageToken) + '/useToken');
     
     const verification_token_string = new Uint16Array(verification_token).join('')
-    console.log("verification token string:")
-    console.log(verification_token_string)
+    // console.log("verification token string:")
+    // console.log(verification_token_string)
     return returnResult(request, JSON.stringify({
       image_id: image_id,
       size: val.byteLength,

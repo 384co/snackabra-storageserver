@@ -10,3 +10,4 @@ wrangler.toml
 .secret.*
 node_modules
 /.mf/
+yarn.lock
