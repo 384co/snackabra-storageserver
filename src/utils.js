@@ -52,7 +52,7 @@ export function assemblePayload(data) {
       startIndex += data[key].byteLength;
       _data = _appendBuffer(_data, data[key]);
     }
-    console.log("Metadata: ", metadata);
+    // console.log("Metadata: ", metadata);
     let encoder = new TextEncoder();
     const metadataBuffer = encoder.encode(JSON.stringify(metadata));
     const metadataSize = new Uint32Array([metadataBuffer.byteLength]);
@@ -71,10 +71,10 @@ function extractPayloadV1(payload) {
   try {
     const metadataSize = new Uint32Array(payload.slice(0, 4))[0];
     const decoder = new TextDecoder();
-    console.log("METADATASIZE: ", metadataSize)
-    console.log("METADATASTRING: ", decoder.decode(payload.slice(4, 4 + metadataSize)))
+    // console.log("METADATASIZE: ", metadataSize)
+    // console.log("METADATASTRING: ", decoder.decode(payload.slice(4, 4 + metadataSize)))
     const metadata = JSON.parse(decoder.decode(payload.slice(4, 4 + metadataSize)));
-    console.log("METADATA EXTRACTED", JSON.stringify(metadata))
+    // console.log("METADATA EXTRACTED", JSON.stringify(metadata))
     let startIndex = 4 + metadataSize;
     let data = {};
     for (const key in metadata) {
@@ -95,10 +95,10 @@ export function extractPayload(payload) {
   try {
     const metadataSize = new Uint32Array(payload.slice(0, 4))[0];
     const decoder = new TextDecoder();
-    console.log("METADATASIZE: ", metadataSize)
-    console.log("METADATASTRING: ", decoder.decode(payload.slice(4, 4 + metadataSize)))
+    // console.log("METADATASIZE: ", metadataSize)
+    // console.log("METADATASTRING: ", decoder.decode(payload.slice(4, 4 + metadataSize)))
     const _metadata = JSON.parse(decoder.decode(payload.slice(4, 4 + metadataSize)));
-    console.log("METADATA EXTRACTED", JSON.stringify(_metadata))
+    // console.log("METADATA EXTRACTED", JSON.stringify(_metadata))
     let startIndex = 4 + metadataSize;
     if (!_metadata.hasOwnProperty("version")) {
       _metadata["version"] = "001";
@@ -117,8 +117,8 @@ export function extractPayload(payload) {
             data[_metadata[_index]["name"]] = payload.slice(startIndex + propertyStartIndex, startIndex + propertyStartIndex + size);
           }
         }
-        console.log("========== extractPayload:")
-        console.log(data)
+        // console.log("========== extractPayload:")
+        // console.log(data)
         return data;
     }
   }
