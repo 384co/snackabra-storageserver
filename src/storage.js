@@ -26,7 +26,7 @@
  * 2. we will return an error message on exception in your Response rather
  *    than the default 404.html page.
  */
-const DEBUG = false
+const DEBUG = true
 const DEBUG2 = false
 
 import * as utils from "./utils.js";
@@ -84,6 +84,11 @@ async function returnResult(request, contents, s, delay = 0) {
     "Access-Control-Allow-Headers": "Content-Type, authorization",
     'Content-Type': 'application/json;',
     "Access-Control-Allow-Origin": request.headers.get("Origin")
+  }
+  if (s < 200 || s >= 599) {
+    console.error("returnResult: invalid status code: ")
+    console.warn(s)
+    s = 500;
   }
   const r = new Response(contents, { status: s, headers: corsHeaders });
   await new Promise(resolve => setTimeout(resolve, delay));
@@ -286,7 +291,7 @@ async function handleFetchData(request, env) {
       console.log("object not found (error?)")
       // TODO: add capabilities to delay responses
       // update: done
-      return returnResult(request, JSON.stringify({ error: 'cannot find object' }), 50)
+      return returnResult(request, JSON.stringify({ error: 'cannot find object' }), 404, 50)
     } else {
       const data = utils.extractPayload(stored_data)
       if (DEBUG2) {
@@ -315,6 +320,8 @@ async function handleFetchData(request, env) {
       return new Response(utils.assemblePayload(data), { status: 200, headers: corsHeaders })
     }
   } catch (error) {
+    console.warn("error:")
+    console.warn(error)
     return returnResult(request, JSON.stringify({ error: error.toString() }), 500)
   }
 }
