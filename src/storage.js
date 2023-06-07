@@ -198,6 +198,20 @@ function genKey(type, id) {
   return key
 }
 
+// tokens are 64 bits (4x uint16)
+// new design is they were communicated as a string of 4 uint16s separated by a period
+// historically they were simply appended.  new design allows reversing binary format.
+// for validation we accept either format
+function verifyToken(verification_token, stored_verification_token) {
+  const stored_verification_token_v1 = new Uint16Array(stored_verification_token).join('')
+  const stored_verification_token_v2 = new Uint16Array(stored_verification_token).join('.')
+  if (verification_token === stored_verification_token_v1 || verification_token === stored_verification_token_v2) {
+    return true;
+  } else {
+    return false;
+  }
+}
+
 async function handleStoreData(request, env) {
   try {
     const { searchParams } = new URL(request.url);
@@ -252,8 +266,10 @@ async function handleStoreData(request, env) {
     // env.RECOVERY_NAMESPACE.put(image_id + '_' + _storage_token.token_hash, 'true');
     // await fetch('https://s_socket.privacy.app/api/token/' + new TextDecoder().decode(storageToken) + '/useToken');
 
-    const verification_token_string = new Uint16Array(verification_token).join('')
-    if (DEBUG2) { console.log("verification token string:"); console.log(verification_token_string); }
+    // 2023.04.22: changed, uses '.' so it's reversible
+    const verification_token_string = new Uint16Array(verification_token).join('.')
+    // console.log("verification token string:")
+    // console.log(verification_token_string)
     return returnResult(request, JSON.stringify({
       image_id: image_id,
       size: val.byteLength,
@@ -302,13 +318,14 @@ async function handleFetchData(request, env) {
       }
       // const storage_resp = await (await fetch('https://s_socket.privacy.app/api/token/' + storage_token + '/checkUsage')).json();
       console.log(data.verification_token)
-      const stored_verification_token = new Uint16Array(data.verification_token).join('')
-      if (verification_token !== stored_verification_token) {
+
+      // const stored_verification_token = new Uint16Array(data.verification_token).join('')
+      if (verifyToken(verification_token, data.verification_token) === false) {
         if (DEBUG2) {
           console.log("received:")
           console.log(verification_token)
           console.log("expected:")
-          console.log(stored_verification_token)
+          console.log(data.verification_token)
         }
         return returnResult(request, JSON.stringify({ error: 'Verification failed' }), 200, 50);
       }
@@ -326,9 +343,7 @@ async function handleFetchData(request, env) {
   }
 }
 
-
-
-async function verifyStorage(data, id, env, _ledger_resp) {
+async function verifyStorage(data, id, _env, _ledger_resp) {
   const dataHash = await generateDataHash(data.image);
   if (id.slice(-dataHash.length) !== dataHash) {
     return false;
