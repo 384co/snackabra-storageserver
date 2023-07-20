@@ -27,12 +27,14 @@
  *    than the default 404.html page.
  */
 const DEBUG = true
+const DEBUG2 = false
+
 import * as utils from "./utils.js";
 
 export default {
   async fetch(request, env, ctx) {
-    // console.log("Origin:")
-    // console.log(request.headers.get("Origin"))
+    if (DEBUG2) console.log("Origin:")
+    if (DEBUG2) console.log(request.headers.get("Origin"))
     try {
       return await handleRequest(request, env, ctx);
     } catch (e) {
@@ -46,7 +48,7 @@ export default {
 
 async function handleRequest(request, env) {  // not using ctx
   try {
-    // console.log(request)
+    if (DEBUG2) console.log(request)
     let options = {}
     if (DEBUG) {
       // customize caching
@@ -63,7 +65,7 @@ async function handleRequest(request, env) {  // not using ctx
     } else if (pathname === '/.well-known/apple-app-site-association') {
       return universalLinkFile(request);
     } else {
-      return returnResult(request, JSON.stringify({ error: pathname + ' Not found' }), 404);
+      return returnResult(request, JSON.stringify({ error: pathname + ' Not found' }), 404, 50);
     }
   } catch (e) {
     // if an error is thrown try to serve the asset at 404.html
@@ -74,15 +76,23 @@ async function handleRequest(request, env) {  // not using ctx
   }
 }
 
-function returnResult(request, contents, s) {
+// in various defensive scenarios, we want to add some friction to 
+// various possibilities of crawling or exhaustive operations
+async function returnResult(request, contents, s, delay = 0) {
   const corsHeaders = {
     "Access-Control-Allow-Methods": "POST, OPTIONS, GET",
     "Access-Control-Allow-Headers": "Content-Type, authorization",
     'Content-Type': 'application/json;',
     "Access-Control-Allow-Origin": request.headers.get("Origin")
   }
+  if (s < 200 || s >= 599) {
+    console.error("returnResult: invalid status code: ")
+    console.warn(s)
+    s = 500;
+  }
   const r = new Response(contents, { status: s, headers: corsHeaders });
-  // console.log("returnResult:"); console.log(r)
+  await new Promise(resolve => setTimeout(resolve, delay));
+  if (DEBUG2) { console.log("returnResult:"); console.log(r); }
   return r
 }
 
@@ -140,15 +150,25 @@ function handleDevelopmentMode() {
 
 async function handleStoreRequest(request, env) {
   try {
+    if (DEBUG2) console.log("handleStoreRequest()")
     const { searchParams } = new URL(request.url);
     const name = searchParams.get('name');
-    const list_resp = await env.IMAGES_NAMESPACE.list({ 'prefix': name });
+    const type = searchParams.get('type');
+    if (!type) return returnResult(request, JSON.stringify({ error: "ERROR: you need type (note: old client bug)" }), 500)
+    if (DEBUG2) console.log(`prefix name: ${genKey(type, name)}`)
+    // psm ugh: this never did genKey!  it never returned correct salt/iv
+    const list_resp = await env.IMAGES_NAMESPACE.list({ 'prefix': genKey(type, name) });
     let data = {};
     if (list_resp.keys.length > 0) {
+      if (DEBUG) console.log("found object")
       const key = list_resp.keys[0].name;
       const val = await env.IMAGES_NAMESPACE.get(key, { type: "arrayBuffer" });
       data = utils.extractPayload(val);
+    } else {
+      if (DEBUG) console.log("did NOT find object")
     }
+    if (DEBUG2) console.log("got blob data:")
+    if (DEBUG2) console.log(data)
     const salt = Object.prototype.hasOwnProperty.call(data, 'salt') ? data.salt : crypto.getRandomValues(new Uint8Array(16));
     const iv = Object.prototype.hasOwnProperty.call(data, 'iv') ? data.iv : crypto.getRandomValues(new Uint8Array(12));
     // subtle not doing this:
@@ -156,8 +176,8 @@ async function handleStoreRequest(request, env) {
     // const iv = data.hasOwnProperty('iv') ? data.iv : crypto.getRandomValues(new Uint8Array(12));
 
     const return_data = { iv: iv, salt: salt };
-    console.log('handleStoreRequest returning:')
-    console.log(return_data)
+    if (DEBUG2) console.log('handleStoreRequest returning:')
+    if (DEBUG2) console.log(return_data)
     const payload = utils.assemblePayload(return_data);
     const corsHeaders = {
       "Access-Control-Allow-Methods": "POST, OPTIONS, GET",
@@ -174,52 +194,69 @@ async function handleStoreRequest(request, env) {
 
 function genKey(type, id) {
   const key = "____" + type + "__" + id + "______"
-  // console.log(`genKey(): '${key}'`)
+  if (DEBUG2) console.log(`genKey(): '${key}'`)
   return key
+}
+
+// tokens are 64 bits (4x uint16)
+// new design is they were communicated as a string of 4 uint16s separated by a period
+// historically they were simply appended.  new design allows reversing binary format.
+// for validation we accept either format
+function verifyToken(verification_token, stored_verification_token) {
+  const stored_verification_token_v1 = new Uint16Array(stored_verification_token).join('')
+  const stored_verification_token_v2 = new Uint16Array(stored_verification_token).join('.')
+  if (verification_token === stored_verification_token_v1 || verification_token === stored_verification_token_v2) {
+    return true;
+  } else {
+    return false;
+  }
 }
 
 async function handleStoreData(request, env) {
   try {
     const { searchParams } = new URL(request.url);
     const image_id = searchParams.get('key')
-    // console.log(image_id)
+    if (DEBUG2) console.log(image_id)
     const type = searchParams.get('type')
     const key = genKey(type, image_id)
-    // console.log(key, await IMAGES_NAMESPACE.get(key))
+    if (DEBUG2) console.log(key, await env.IMAGES_NAMESPACE.get(key))
     const val = await request.arrayBuffer();
     const data = utils.extractPayload(val);
-    console.log("EXTRACTED DATA IN MAIN: ", Object.keys(data))
+    if (DEBUG2) console.log("EXTRACTED DATA IN MAIN: ", Object.keys(data))
     // const storageToken = data.storageToken;
     let verification_token;
 
-    console.log("storageToken:")
-    console.log(data.storageToken)
+    if (DEBUG2) console.log("storageToken processing:")
+    if (DEBUG2) console.log(data.storageToken)
     const _storage_token = JSON.parse((new TextDecoder).decode(data.storageToken));
-    let _ledger_resp = JSON.parse(await env.LEDGER_NAMESPACE.get(_storage_token.token_hash)) || {};
-    console.log(_ledger_resp, _storage_token)
-    /* if (!verifyStorage(data, image_id, env, _ledger_resp)) {
-      return returnResult(request, JSON.stringify({ error: 'Ledger(s) refused storage request - authentication or storage budget issue, or malformed request' }), 500);
-    } */
+    if ('error' in _storage_token) return returnResult(request, JSON.stringify(_storage_token));
+    if (DEBUG2) console.log(_storage_token);
+    let _storage_token_hash = await env.LEDGER_NAMESPACE.get(_storage_token.token_hash);
+    let _ledger_resp = JSON.parse(_storage_token_hash) || {};
+    if (DEBUG2) console.log(_ledger_resp, _storage_token)
+    if (!verifyStorage(data, image_id, env, _ledger_resp)) {
+      return returnResult(request, JSON.stringify({ error: 'Ledger(s) refused storage request - authentication or storage budget issue, or malformed request' }), 500, 50);
+    }
     const stored_data = await env.IMAGES_NAMESPACE.get(key, { type: "arrayBuffer" });
     if (stored_data == null) {
-      console.log("======== data was new")
+      if (DEBUG2) console.log("======== data was new")
       verification_token = crypto.getRandomValues(new Uint16Array(4)).buffer;
       data['verification_token'] = verification_token;
       const assembled_data = utils.assemblePayload(data)
-      console.log("assembled data")
-      console.log(assembled_data)
+      if (DEBUG2) console.log("assembled data")
+      if (DEBUG2) console.log(assembled_data)
       await env.IMAGES_NAMESPACE.put(key, assembled_data);
-      console.log("Generated and stored verification token:" /*, store_resp */) // wait there is no "store_resp"?
-      console.log(verification_token)
+      if (DEBUG2) console.log("Generated and stored verification token:" /*, store_resp */) // wait there is no "store_resp"?
+      if (DEBUG2) console.log(verification_token)
     } else {
-      console.log("======== data was deduplicated")
+      if (DEBUG2) console.log("======== data was deduplicated")
       const data = utils.extractPayload(stored_data);
-      console.log(data)
-      console.log("found verification token:")
-      console.log(data.verification_token)
+      if (DEBUG2) console.log(data)
+      if (DEBUG2) console.log("found verification token:")
+      if (DEBUG2) console.log(data.verification_token)
       verification_token = data.verification_token;
     }
-    // console.log("Extracted data: ", data)
+    if (DEBUG2) console.log("Extracted data: ", data)
     // TODO - disabling this for now, IMPORTANT to sort out storage token consumption
     //        this code consumes the token to stop double use
     // _ledger_resp.used = true;
@@ -228,10 +265,11 @@ async function handleStoreData(request, env) {
     // env.RECOVERY_NAMESPACE.put(_storage_token.token_hash + '_' + image_id, 'true');
     // env.RECOVERY_NAMESPACE.put(image_id + '_' + _storage_token.token_hash, 'true');
     // await fetch('https://s_socket.privacy.app/api/token/' + new TextDecoder().decode(storageToken) + '/useToken');
-    
-    const verification_token_string = new Uint16Array(verification_token).join('')
-    console.log("verification token string:")
-    console.log(verification_token_string)
+
+    // 2023.04.22: changed, uses '.' so it's reversible
+    const verification_token_string = new Uint16Array(verification_token).join('.')
+    // console.log("verification token string:")
+    // console.log(verification_token_string)
     return returnResult(request, JSON.stringify({
       image_id: image_id,
       size: val.byteLength,
@@ -244,50 +282,52 @@ async function handleStoreData(request, env) {
   }
 }
 
-// delays the call by 't' milliseconds
-function delay(t, v) {
-  return new Promise(resolve => setTimeout(resolve, t, v))
-}
-
 async function handleFetchData(request, env) {
   try {
-    console.log("handleFetchData()")
-    // console.log(request)
     const { searchParams } = new URL(request.url)
-    console.log("searchParams:")
-    console.log(searchParams)
     const verification_token = searchParams.get('verification_token')
-    console.log("verification_token:")
-    console.log(verification_token)
     let type = searchParams.get('type')
-    console.log("====== found type")
-    console.log(type)
+    if (DEBUG2) {
+      console.log("handleFetchData()")
+      console.log(request)
+      console.log("searchParams:")
+      console.log(searchParams)
+      console.log("verification_token:")
+      console.log(verification_token)
+      console.log("====== found type")
+      console.log(type)
+    }
     if (!type) type = 'p' // psm: fix to *default* not enforced
     // const storage_token = searchParams.get('storage_token');
     const id = searchParams.get('id');
     const key = genKey(type, id)
-    console.log("looking up:")
-    console.log(key)
+    if (DEBUG2) { console.log("looking up:"); console.log(key); }
     const stored_data = await env.IMAGES_NAMESPACE.get(key, { type: "arrayBuffer" })
     if (!stored_data) {
       console.log("object not found (error?)")
       // TODO: add capabilities to delay responses
-      return returnResult(request, JSON.stringify({ error: 'cannot find object' }))
+      // update: done
+      return returnResult(request, JSON.stringify({ error: 'cannot find object' }), 404, 50)
     } else {
-      console.log("Stored data")
-      console.log(stored_data)
       const data = utils.extractPayload(stored_data)
-      console.log("Parsed stored:")
-      console.log(data)
+      if (DEBUG2) {
+        console.log("Stored data");
+        console.log(stored_data);
+        console.log("Parsed stored:")
+        console.log(data)
+      }
       // const storage_resp = await (await fetch('https://s_socket.privacy.app/api/token/' + storage_token + '/checkUsage')).json();
       console.log(data.verification_token)
-      const stored_verification_token = new Uint16Array(data.verification_token).join('')
-      if (verification_token !== stored_verification_token) {
-        console.log("received:")
-        console.log(verification_token)
-        console.log("expected:")
-        console.log(stored_verification_token)
-        return returnResult(request, JSON.stringify({ error: 'Verification failed' }), 200);
+
+      // const stored_verification_token = new Uint16Array(data.verification_token).join('')
+      if (verifyToken(verification_token, data.verification_token) === false) {
+        if (DEBUG2) {
+          console.log("received:")
+          console.log(verification_token)
+          console.log("expected:")
+          console.log(data.verification_token)
+        }
+        return returnResult(request, JSON.stringify({ error: 'Verification failed' }), 200, 50);
       }
       const corsHeaders = {
         "Access-Control-Allow-Methods": "POST, OPTIONS, GET",
@@ -297,13 +337,13 @@ async function handleFetchData(request, env) {
       return new Response(utils.assemblePayload(data), { status: 200, headers: corsHeaders })
     }
   } catch (error) {
+    console.warn("error:")
+    console.warn(error)
     return returnResult(request, JSON.stringify({ error: error.toString() }), 500)
   }
 }
 
-
-
-async function verifyStorage(data, id, env, _ledger_resp) {
+async function verifyStorage(data, id, _env, _ledger_resp) {
   const dataHash = await generateDataHash(data.image);
   if (id.slice(-dataHash.length) !== dataHash) {
     return false;
@@ -354,15 +394,15 @@ function universalLinkFile(request) {
 
 async function handleMigrateStorage(request, env) {
   try {
-    console.log("In handleMigrate");
+    if (DEBUG2) console.log("In handleMigrate");
     let data = await request.arrayBuffer();
     let jsonString = new TextDecoder().decode(data);
     let json = JSON.parse(jsonString);
     let targetURL = json['target'];
-    console.log("TargetURL: ", targetURL)
+    if (DEBUG2) console.log("TargetURL: ", targetURL)
     delete json['target'];
     if (!Object.prototype.hasOwnProperty.call(json, 'SERVER_SECRET') || !(json['SERVER_SECRET'] === env.SERVER_SECRET)) { // yes you just need one '!'
-      return returnResult(request, JSON.stringify({ error: "Server verification failed" }), 500)
+      return returnResult(request, JSON.stringify({ error: "Server verification failed" }), 500, 50)
     }
     delete json['SERVER_SECRET']
     for (let key in json) {
@@ -399,14 +439,14 @@ async function handleFetchDataMigration(request, env) {
     const type = searchParams.get('type')
     const key = genKey(type, id)
     const stored_data = await env.IMAGES_NAMESPACE.get(key, { type: "arrayBuffer" });
-    console.log("Stored data", stored_data)
+    if (DEBUG2) console.log("Stored data", stored_data)
     if (stored_data == null) {
-      return returnResult(request, JSON.stringify({ error: "Could not find data" }), 500);
+      return returnResult(request, JSON.stringify({ error: "Could not find data" }), 500, 50);
     }
     const data = utils.extractPayload(stored_data);
     // const storage_resp = await (await fetch('https://s_socket.privacy.app/api/token/' + storage_token + '/checkUsage')).json();
     if (verification_token !== new Uint16Array(data.verification_token).join('')) {
-      return returnResult(request, JSON.stringify({ error: 'Verification failed' }), 200);
+      return returnResult(request, JSON.stringify({ error: 'Verification failed' }), 200, 50);
     }
     const corsHeaders = {
       "Access-Control-Allow-Methods": "POST, OPTIONS, GET",

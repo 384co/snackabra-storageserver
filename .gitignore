@@ -10,3 +10,10 @@ wrangler.toml
 .secret.*
 node_modules
 /.mf/
+yarn.lock
+.DS_Store
+.DS_Store/
+yarn-error.log
+.wrangler
+.wrangler/
+*.wrangler.toml
