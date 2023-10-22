@@ -33,6 +33,10 @@ import * as utils from "./utils.js";
 
 export default {
   async fetch(request, env, ctx) {
+    if (DEBUG) {
+      console.log("fetching request:")
+      console.log(request)
+    }
     if (DEBUG2) console.log("Origin:")
     if (DEBUG2) console.log(request.headers.get("Origin"))
     try {
