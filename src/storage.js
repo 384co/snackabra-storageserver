@@ -25,8 +25,10 @@
  *    debug.
  * 2. we will return an error message on exception in your Response rather
  *    than the default 404.html page.
+ * 
+ * Should not be deployed to production with either DEBUG on.
  */
-const DEBUG = true
+const DEBUG = false
 const DEBUG2 = false
 
 import * as utils from "./utils.js";
@@ -257,6 +259,7 @@ async function handleStoreData(request, env) {
       verification_token = data.verification_token;
     }
     if (DEBUG2) console.log("Extracted data: ", data)
+    
     // TODO - disabling this for now, IMPORTANT to sort out storage token consumption
     //        this code consumes the token to stop double use
     // _ledger_resp.used = true;
