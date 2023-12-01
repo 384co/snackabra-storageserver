@@ -28,7 +28,7 @@
  * 
  * Should not be deployed to production with either DEBUG on.
  */
-const DEBUG = true
+const DEBUG = false
 const DEBUG2 = false
 
 import * as utils from "./utils.js";
