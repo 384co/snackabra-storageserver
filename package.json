@@ -3,20 +3,27 @@
   "author": "Magnusson Institute",
   "email" : "snackabra@gmail.com",
   "description": "Snackabra Storage Server",
-  "version": "0.6.0",
-  "module": "./src/storage.js",
+  "version": "2.0.0 (pre)",
   "bugs": "https://github.com/snackabra/snackabra-storageserver/issues",
   "homepage": "https://snackabra.io",
+  "keywords": [],
   "license": "GPL-3.0-only",
   "private": false,
   "scripts": {
     "start": "wrangler dev --port 3843",
-    "deploy": "wrangler publish"
+    "deploy": "wrangler deploy",
+    "deploy:prod": "wrangler deploy --env production"
   },
   "devDependencies": {
-    "eslint": "^8.8.0",
-    "eslint-plugin-react": "^7.28.0",
+    "@cloudflare/workers-types": "^4.20230419.0",
     "miniflare": "^3.0.1",
+    "ts-loader": "^9.4.2",
+    "typescript": "^5.0.4",
+    "webpack": "^5.84.1",
+    "worker-loader": "^3.0.8",
     "wrangler": "^3.0.0"
+  },
+  "dependencies": {
+    "snackabra": "^2.0.0"
   }
 }
