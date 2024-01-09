@@ -25,14 +25,20 @@
  *    debug.
  * 2. we will return an error message on exception in your Response rather
  *    than the default 404.html page.
+ * 
+ * Should not be deployed to production with either DEBUG on.
  */
-const DEBUG = true
+const DEBUG = false
 const DEBUG2 = false
 
 import * as utils from "./utils.js";
 
 export default {
   async fetch(request, env, ctx) {
+    if (DEBUG) {
+      console.log("fetching request:")
+      console.log(request)
+    }
     if (DEBUG2) console.log("Origin:")
     if (DEBUG2) console.log(request.headers.get("Origin"))
     try {
@@ -213,27 +219,30 @@ function verifyToken(verification_token, stored_verification_token) {
 }
 
 async function handleStoreData(request, env) {
+  console.log("==== handleStoreData()")
   try {
     const { searchParams } = new URL(request.url);
     const image_id = searchParams.get('key')
-    if (DEBUG2) console.log(image_id)
     const type = searchParams.get('type')
     const key = genKey(type, image_id)
-    if (DEBUG2) console.log(key, await env.IMAGES_NAMESPACE.get(key))
     const val = await request.arrayBuffer();
     const data = utils.extractPayload(val);
-    if (DEBUG2) console.log("EXTRACTED DATA IN MAIN: ", Object.keys(data))
-    // const storageToken = data.storageToken;
+    if (DEBUG2) {
+      console.log("searchParams:", searchParams)
+      console.log("image_id:", image_id)
+      console.log("key / env.key:", key, await env.IMAGES_NAMESPACE.get(key))
+      console.log("EXTRACTED DATA IN MAIN: ", Object.keys(data))
+      console.log("storageToken processing:", data.storageToken)
+    }
+ 
     let verification_token;
 
-    if (DEBUG2) console.log("storageToken processing:")
-    if (DEBUG2) console.log(data.storageToken)
     const _storage_token = JSON.parse((new TextDecoder).decode(data.storageToken));
     if ('error' in _storage_token) return returnResult(request, JSON.stringify(_storage_token));
-    if (DEBUG2) console.log(_storage_token);
     let _storage_token_hash = await env.LEDGER_NAMESPACE.get(_storage_token.token_hash);
     let _ledger_resp = JSON.parse(_storage_token_hash) || {};
-    if (DEBUG2) console.log(_ledger_resp, _storage_token)
+    if (DEBUG2) console.log("tokens: ", _ledger_resp, _storage_token)
+
     if (!verifyStorage(data, image_id, env, _ledger_resp)) {
       return returnResult(request, JSON.stringify({ error: 'Ledger(s) refused storage request - authentication or storage budget issue, or malformed request' }), 500, 50);
     }
@@ -243,24 +252,26 @@ async function handleStoreData(request, env) {
       verification_token = crypto.getRandomValues(new Uint16Array(4)).buffer;
       data['verification_token'] = verification_token;
       const assembled_data = utils.assemblePayload(data)
-      if (DEBUG2) console.log("assembled data")
-      if (DEBUG2) console.log(assembled_data)
+      if (DEBUG2) console.log("assembled data", assembled_data)
       await env.IMAGES_NAMESPACE.put(key, assembled_data);
-      if (DEBUG2) console.log("Generated and stored verification token:" /*, store_resp */) // wait there is no "store_resp"?
-      if (DEBUG2) console.log(verification_token)
+      if (DEBUG2) console.log("Generated and stored verification token:", verification_token /*, store_resp */) // wait there is no "store_resp"?
     } else {
-      if (DEBUG2) console.log("======== data was deduplicated")
       const data = utils.extractPayload(stored_data);
-      if (DEBUG2) console.log(data)
-      if (DEBUG2) console.log("found verification token:")
-      if (DEBUG2) console.log(data.verification_token)
+      if (DEBUG2) {
+        console.log("======== data was deduplicated", data)
+        console.log("found verification token:", data.verification_token)
+      }
       verification_token = data.verification_token;
     }
     if (DEBUG2) console.log("Extracted data: ", data)
-    // TODO - disabling this for now, IMPORTANT to sort out storage token consumption
-    //        this code consumes the token to stop double use
-    // _ledger_resp.used = true;
-    // let _put_resp = await env.LEDGER_NAMESPACE.put(_storage_token.token_hash, JSON.stringify(_ledger_resp));
+    
+    // make sure token isn't used multiple times
+    _ledger_resp.used = true;
+    // to avoid race condition, we await response from ledger before storing
+    const _put_resp = await env.LEDGER_NAMESPACE.put(_storage_token.token_hash, JSON.stringify(_ledger_resp));
+    if (DEBUG2) console.log("ledger response to clearing token (setting to 'used'):", _put_resp)
+
+    // we no longer need recovery namespace since we are using permanent storage
     // env.RECOVERY_NAMESPACE.put(_storage_token.hashed_room_id + '_' + _storage_token.encrypted_token_id, 'true');
     // env.RECOVERY_NAMESPACE.put(_storage_token.token_hash + '_' + image_id, 'true');
     // env.RECOVERY_NAMESPACE.put(image_id + '_' + _storage_token.token_hash, 'true');
@@ -274,7 +285,7 @@ async function handleStoreData(request, env) {
       image_id: image_id,
       size: val.byteLength,
       verification_token: verification_token_string,
-      // ledger_resp: _put_resp  // TODO: see above
+      ledger_resp: _put_resp
     }), 200);
   } catch (error) {
     console.log("Error posting image: ", error);
@@ -343,20 +354,6 @@ async function handleFetchData(request, env) {
   }
 }
 
-async function verifyStorage(data, id, _env, _ledger_resp) {
-  const dataHash = await generateDataHash(data.image);
-  if (id.slice(-dataHash.length) !== dataHash) {
-    return false;
-  }
-  // older design ... we think ...
-  // const ledger_data = JSON.parse((new TextDecoder()).decode(data.storageToken)) || {};
-  // const token_hash = ledger_data.token_hash_buffer;
-  if (!_ledger_resp || _ledger_resp.used || _ledger_resp.size !== data.image.byteLength) {
-    return false;
-  }
-  return true;
-}
-
 async function generateDataHash(data) {
   try {
     const digest = await crypto.subtle.digest('SHA-256', data);
@@ -365,6 +362,13 @@ async function generateDataHash(data) {
     console.log(e);
     return null;
   }
+}
+
+async function verifyStorage(data, id, _env, _ledger_resp) {
+  const dataHash = await generateDataHash(data.image);
+  if (id.slice(-dataHash.length) !== dataHash) return false;
+  if (!_ledger_resp || _ledger_resp.used || _ledger_resp.size !== data.image.byteLength) return false;
+  return true;
 }
 
 function universalLinkFile(request) {
