@@ -22,90 +22,28 @@
 
 
 import type { EnvType } from './env'
-import { DEBUG, DEBUG2 } from './env'
 import { _sb_assert, returnResult, returnResultJson,
-    returnBinaryResult, returnError, getServerStorageToken, ANONYMOUS_CANNOT_CONNECT_MSG } from './workers'
-
-if (DEBUG) console.log("++++ channel server code loaded ++++ DEBUG is enabled ++++")
-if (DEBUG2) console.log("++++ DEBUG2 (verbose) enabled ++++")
+    returnBinaryResult, returnError, getServerStorageToken,
+    ANONYMOUS_CANNOT_CONNECT_MSG } from './workers'
 
 // import type { SBPayload } from 'snackabra'
-import { assemblePayload, extractPayload, arrayBufferToBase62, SBStorageToken } from 'snackabra'
+import { assemblePayload, extractPayload, arrayBufferToBase62, base62ToArrayBuffer,
+        SBStorageToken, SBObjectHandle, stringify_SBObjectHandle, Base62Encoded } from 'snackabra'
 
 export { default } from './workers'
 
-// export default {
-//     async fetch(request: Request, env: EnvType) {
-//         if (DEBUG) {
-//             console.log(`==== [${request.method}] Fetch called: ${request.url}`);
-//             if (DEBUG3) console.log(request.headers);
-//         }
-//         return await handleErrors(request, async () => {
-//             return handleRequest(request, env);
-//         });
-//     }
-// }
+// leave these 'false', turn on debugging in the toml file if needed
+let DEBUG = false
+let DEBUG2 = false
 
-// async function handleRequest(request: Request, env: EnvType) {  // not using ctx
-//     try {
-//         if (DEBUG2) console.log(request)
-//         let options: any = {}
-//         if (DEBUG) {
-//             // customize caching
-//             options.cacheControl = {
-//                 bypassCache: true,
-//             };
-//         }
-//         const { method, url } = request
-//         const { pathname } = new URL(url)
-//         if (method === "OPTIONS") {
-//             return handleOptions(request)
-//         } else if (pathname.split('/')[1] === 'api') {
-//             return await handleApiCall(request, env)
-//         } else if (pathname === '/.well-known/apple-app-site-association') {
-//             return universalLinkFile(request);
-//         } else {
-//             return returnError(request, `'${pathname}' Not found`, 404, 50)
-//         }
-//     } catch (err) {
-//         return returnError(request, `[handleRequest] ]${err}`, 404)
-//     }
-// }
-
-// async function handleApiCall(request: Request, env: EnvType) {
-//     const { pathname } = new URL(request.url);
-//     const fname = pathname.split('/')[3];
-//     if (DEBUG) console.log("handleApiCall() fname:", fname)
-//     try {
-//         switch (fname) {
-
-//             default:
-//                 return returnError(request, `Endpoint '${fname}' not understood`, 404)
-//         }
-//     } catch (err) {
-//         return returnError(request, `[${fname}] {err}`)
-//     }
-// }
-
-// function handleOptions(request: Request) {
-//     if (request.headers.get("Origin") !== null &&
-//         request.headers.get("Access-Control-Request-Method") !== null &&
-//         request.headers.get("Access-Control-Request-Headers") !== null) {
-//         return returnResult(request, null)
-//     } else {
-//         // Handle standard OPTIONS request.
-//         return new Response(null, {
-//             headers: {
-//                 "Allow": "POST, OPTIONS",
-//             }
-//         })
-//     }
-// }
-
-
+// toml file can override the default, but we hard code the minimum
+const PRIVACY_WINDOW_DEFAULT = 14 * 24 * 60 * 60;
+const PRIVACY_WINDOW_MINIMUM = 7 * 24 * 60 * 60;
 
 // 'path' is the request path, starting AFTER '/api/v2'
 export async function handleApiRequest(path: Array<string>, request: Request, env: EnvType) {
+    DEBUG = env.DEBUG_ON
+    DEBUG2 = env.VERBOSE_ON
     try {
         switch (path[0]) {
             case 'info':
@@ -118,10 +56,6 @@ export async function handleApiRequest(path: Array<string>, request: Request, en
                 return await handleStoreData(request, env)
             case 'fetchData':
                 return await handleFetchData(request, env)
-            case 'migrateStorage':
-                return await handleMigrateStorage(request, env)
-            case 'fetchDataMigration':
-                return await handleFetchDataMigration(request, env)
             case 'robots.txt':
                 return returnResult(request, "Disallow: /");
             default:
@@ -132,122 +66,151 @@ export async function handleApiRequest(path: Array<string>, request: Request, en
     }
 }
 
-interface shardInfo {
+// 'Shard' and 'ShardInfo' are essentially SBObjectHandle subsets/variant; we keep separate type
+// internally in the storage server to assure tight control of the byte-for-byte
+// format of shards at rest
+
+// shardInfo is the metadata for a shard, stored separately as a special entry
+// of type 'T' in the KV store (the 'type' in the interface is for the shard)
+interface ShardInfo {
     version: '3',
-    id: string,
+    id: Base62Encoded,
     iv: Uint8Array,
     salt: ArrayBuffer,
-    size: number,
-    type: string,
-    verification_token: ArrayBuffer,
+    type: string, // if absent defaults to '_' (underscore)
+    verification: string,
 }
 
-// // given half an object identifier, return (salt, iv) to use for next step
-// async function handleStoreRequest(request: Request, env: EnvType) {
-//     if (DEBUG2) console.log("handleStoreRequest()")
-//     const { searchParams } = new URL(request.url);
-//     const name = searchParams.get('name');
-//     const type = searchParams.get('type') ?? '_'; // new default, shifting to deprecating
-//     if (!name) return returnError(request, "you need name (ID)")
-//     if (DEBUG2) console.log(`prefix name: ${genKey(type, name)}`)
-//     const list_resp = await env.IMAGES_NAMESPACE.list({ 'prefix': genKey(type, name) });
-//     let data: any = {};
-//     if (list_resp.keys.length > 0) {
-//         if (DEBUG) console.log("found object")
-//         const key = list_resp.keys[0].name;
-//         const val = await env.IMAGES_NAMESPACE.get(key, { type: "arrayBuffer" });
-//         if (!val)
-//             return returnError(request, "could not find object", 401)
-//         data = extractPayload(val);
-//     } else {
-//         if (DEBUG) console.log("did NOT find object")
+// this is shard at rest, and what will be precisely delivered on a proper fetch
+interface Shard {
+    version: '3',
+    id: Base62Encoded,
+    iv: Uint8Array,
+    salt: ArrayBuffer,
+    type: string, // single character, defaults to '_'
+    actualSize: number, // of the data in the shard
+    data: ArrayBuffer,
+}
+
+const b62regex = /^[A-Za-z0-9]*$/;
+
+// (very) strict validation against above interfaces
+function validate_ShardOrInfo(s: Shard | ShardInfo): boolean {
+    if (!s) return false;
+    else if (!(
+        // the following should be true of either
+        s.version === '3'
+        && (typeof s.id === 'string' && s.id.length === 43 && b62regex.test(s.id))
+        && (s.iv instanceof Uint8Array && s.iv.byteLength === 12)
+        && (s.salt instanceof ArrayBuffer && s.salt.byteLength === 16)
+        && (typeof s.type === 'string' && s.type.length === 1))) return false;
+    else if ('verification' in s)
+        // strictly speaking we should verify that the individual numbers are within 16-bit range
+        return (s.verification.split('.').map(num => parseInt(num, 10)).join('.') === s.verification)
+    else if ('data' in s && 'actualSize' in s)
+        return (s.data instanceof ArrayBuffer && s.actualSize === s.data.byteLength)
+    else
+        return false;
+}
+
+// // in case we'll come to need this
+// function shardToInfo(shard: Shard, verification: Uint16Array): ShardInfo {
+//     return {
+//         version: '3',
+//         id: shard.id,
+//         iv: arrayBufferToBase62(shard.iv),
+//         salt: arrayBufferToBase62(shard.salt),
+//         size: shard.size,
+//         type: shard.type,
+//         verification: new Uint16Array(verification).join('.'),
 //     }
-//     if (DEBUG2) console.log("got blob data:", data)
-
-//     // convoluted but safer way of getting salt and iv properties
-//     const salt = Object.prototype.hasOwnProperty.call(data, 'salt') ? data['salt'] : crypto.getRandomValues(new Uint8Array(16));
-//     const iv = Object.prototype.hasOwnProperty.call(data, 'iv') ? data['iv'] : crypto.getRandomValues(new Uint8Array(12));
-
-//     return returnResult(request, { iv: iv, salt: salt });
 // }
 
+function infoToShard(info: ShardInfo, data: ArrayBuffer): Shard {
+    return {
+        version: '3',
+        id: info.id,
+        iv: info.iv,
+        salt: info.salt,
+        type: info.type ?? '_',
+        actualSize: data.byteLength,
+        data: data,
+    }
+}
 
-// async function handleStoreRequest(request: Request, env: EnvType) {
-//     if (DEBUG2) console.log("handleStoreRequest()")
-//     const { searchParams } = new URL(request.url);
-//     const name = searchParams.get('name');
-//     if (!name) return returnError(request, "you need name (ID)")
-//     if (DEBUG2) console.log(`prefix name: ${genKey('T', name)}`)
-
-//     const list_resp = await env.IMAGES_NAMESPACE.list({ 'prefix': genKey('T', name) });
-//     let data: any = {};
-//     if (list_resp.keys.length > 0) {
-//         if (DEBUG) console.log("found object")
-//         const key = list_resp.keys[0].name;
-//         const val = await env.IMAGES_NAMESPACE.get(key, { type: "arrayBuffer" });
-//         if (!val)
-//             return returnError(request, "could not find object", 401)
-//         data = extractPayload(val);
-//     } else {
-//         if (DEBUG) console.log("did NOT find object")
-//     }
-//     if (DEBUG2) console.log("got blob data:", data)
-
-//     // convoluted but safer way of getting salt and iv properties
-//     const salt = Object.prototype.hasOwnProperty.call(data, 'salt') ? data['salt'] : crypto.getRandomValues(new Uint8Array(16));
-//     const iv = Object.prototype.hasOwnProperty.call(data, 'iv') ? data['iv'] : crypto.getRandomValues(new Uint8Array(12));
-
-//     return returnResult(request, { iv: iv, salt: salt });
-// }
-
-async function handleStoreRequest(request: Request, env: EnvType) {
-    if (DEBUG2) console.log("handleStoreRequest()")
-    const { searchParams } = new URL(request.url);
-    const name = searchParams.get('name');
-    if (!name) return returnError(request, "you need name (ID)")
-    // TODO: add TTL in handleStoreRequest()
-
-    const key = genKey('T', name);
-    if (DEBUG2) console.log(`Retrieving key ${key}`);
-
+// fetches shard info, or creates a new one if it doesn't exist;
+// it returns the handle (note, in stringified form)
+async function getShardInfo(id: string, env: EnvType): Promise<ShardInfo | null> {
+    if (!id) throw new Error("getShardInfo() called without id")
+    const key = genKey('T', id);
+    if (DEBUG2) console.log(`Retrieving 'T' key ${key}`);
     const val = await env.IMAGES_NAMESPACE.get(key, { type: "arrayBuffer" });
     if (val) { 
-        const data = extractPayload(val).payload as shardInfo;
-        if (DEBUG2) console.log("got blob data / metadata:", data)
-        return returnResult(request, { iv: data.iv, salt: data.salt });
-    } else {
-        // new object, create new salt and iv and store it to KV
-        const salt = crypto.getRandomValues(new Uint8Array(16));
-        const iv = crypto.getRandomValues(new Uint8Array(12));
-        const data: shardInfo = {
-            version: '3',
-            id: name,
-            iv: iv,
-            salt: salt,
-            size: -1, // indicates unknown
-            type: 'T',
-            verification_token: crypto.getRandomValues(new Uint16Array(4)).buffer,
+        const data = extractPayload(val).payload as ShardInfo;
+        if (!validate_ShardOrInfo(data)) {
+            console.error("[150] Failed to validate new shard info:", data)
+            return null
         }
-        const assembled_data = assemblePayload(data);
-        if (!assembled_data)
-            return returnError(request, "[Internal Error] L235", 500)
-        if (DEBUG) console.log("writing shard info back to type 'T'", key, data)
+        return data;
+    } else {
+        // it's new, create the record
+        const info: ShardInfo = {
+            version: '3',
+            id: id,
+            iv: crypto.getRandomValues(new Uint8Array(12)),
+            salt: crypto.getRandomValues(new Uint8Array(16)).buffer,
+            type: 'T',
+            verification: new Uint16Array(crypto.getRandomValues(new Uint16Array(4))).join('.'),
+        }
+        if (DEBUG2) console.log("writing shard info back to type 'T'", key, info)
 
-        // privacy window is set to 14 days (with a random jitter of 10%)
-        var ttl = 14 * 24 * 60 * 60; // in seconds
-        ttl += (Math.random() - 0.5) * 0.2 * ttl;
+        if (!validate_ShardOrInfo(info)) {
+            console.error("[162] Failed to validate new shard info:", info)
+            return null
+        }
+
+        const assembled_data = assemblePayload(info);
+        if (!assembled_data) {
+            console.error("Failed to assemble new salt and iv:", info)
+            return null
+        }
+
+        var ttl = Number(env.PRIVACY_WINDOW) ?? PRIVACY_WINDOW_DEFAULT; // in seconds
+        if (ttl < PRIVACY_WINDOW_MINIMUM) ttl = PRIVACY_WINDOW_MINIMUM
+        ttl += (Math.random() - 0.5) * 0.2 * ttl; // 10% jitter
 
         const resp = await env.IMAGES_NAMESPACE.put(key, assembled_data, { expirationTtl: ttl });
         if (resp !== null) {
-            if (DEBUG) console.log("Stored new salt and iv:", data)
-            return returnResult(request, { iv: iv, salt: salt });
+            if (DEBUG2) console.log("Stored new salt and iv:", info)
+            return info;
         } else {
-            if (DEBUG) console.error("Failed to store new salt and iv:", resp)
-            return returnError(request, "Internal Error [L249]");
+            console.error("Failed to store new salt and iv:", resp)
+            return null;
         }
     }
 }
 
+// '/api/v2/storeRequest': will provide the (iv, salt) for a given ID
+async function handleStoreRequest(request: Request, env: EnvType) {
+    if (DEBUG2) console.log("handleStoreRequest()")
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get('id');
+    // let's print out all values in searchParams
+    console.log(searchParams)
+    for (const [key, value] of searchParams) {
+        console.log(`${key}: ${value}`);
+    }
+    if (!id) return returnError(request, "you need object id (missing)")
+    console.log("id:", id)
+    // TODO: add TTL in handleStoreRequest()
+    const data = await getShardInfo(id, env);
+    if (data)
+        return returnResult(request, { iv: data.iv, salt: data.salt });
+    else {
+        console.error("[203] Failed to get shard info for:", id)
+        return returnError(request, "[Internal Error]")
+    }
+}
 
 function genKey(type: string, id: string) {
     const key = "____" + type + "__" + id + "______"
@@ -255,205 +218,126 @@ function genKey(type: string, id: string) {
     return key
 }
 
-// tokens are 64 bits (4x uint16)
-// new design is they were communicated as a string of 4 uint16s separated by a period
-// historically they were simply appended.  new design allows reversing binary format.
-// for validation we accept either format
-function verifyToken(verification_token: string, stored_verification_token: ArrayBuffer) {
-    const stored_verification_token_v1 = new Uint16Array(stored_verification_token).join('')
-    const stored_verification_token_v2 = new Uint16Array(stored_verification_token).join('.') // '.' is new separator
-    if (verification_token === stored_verification_token_v1 || verification_token === stored_verification_token_v2) {
-        return true;
-    } else {
-        return false;
-    }
-}
 
-// performs actual storage
+// '/api/v2/storeData': performs actual storage
 async function handleStoreData(request: Request, env: EnvType) {
     if (DEBUG) console.log("==== handleStoreData()")
     try {
-        const { searchParams } = new URL(request.url);
-        const image_id = searchParams.get('key')
-        if (!image_id) return returnError(request, "missing 'key'")
-        const key = genKey('_', image_id)
-        const val = await request.arrayBuffer();
-        const data = extractPayload(val).payload;
+        // const id = new URL(request.url).searchParams.get('id')
+        // if (!id) return returnError(request, "missing 'id'")
 
-        if (DEBUG) {
-            console.log("image_id:", image_id)
-            console.log("key / env.key:", key, await env.IMAGES_NAMESPACE.get(key))
-            console.log("EXTRACTED DATA IN MAIN: ", Object.keys(data))
-            console.log("storageToken processing:", data.storageToken)
-            console.log(data.image)
+        const data = extractPayload(await request.arrayBuffer()).payload;
+        if (!data || !data.id || !data.data || !data.iv || !data.salt || !data.storageToken) {
+            if (DEBUG) console.error('Ledger(s) refused storage request - malformed request', data)
+            return returnError(request, "malformed request, missing information")
         }
 
-        let verification_token: ArrayBufferLike;
-        // const _storage_token = JSON.parse((new TextDecoder).decode(data.storageToken));
-        const _storage_token = data.storageToken;
-
-        const serverToken = await getServerStorageToken(_storage_token.hash, env)
+        const serverToken = await getServerStorageToken(data.storageToken.hash, env)
         if (!serverToken) {
-          if (DEBUG) console.error(`ERROR **** Having issues processing storage token '${_storage_token.hash}'`)
+          console.error('[handleStoreData] Having issues processing storage token, did not receive anything from using', data.storageToken)
           return returnError(request, ANONYMOUS_CANNOT_CONNECT_MSG, 401);
         }
         if (DEBUG) console.log("tokens: ", serverToken)
 
-        if (!verifyStorage(data, image_id, env, serverToken)) {
+        if (!verifyStorageToken(data, data.id, env, serverToken)) {
             if (DEBUG) console.error('Ledger(s) refused storage request - authentication or storage budget issue, or malformed request')
             return returnError(request, ANONYMOUS_CANNOT_CONNECT_MSG);
         }
 
-        // we now get the meta data on the object
+        console.log("Will call with data, id:", data, data.id)
+        const info = await getShardInfo(data.id, env);
+        if (!info) return returnError(request, "[Internal Error]")
 
-        const verKey = genKey('T', image_id);
-        if (DEBUG2) console.log(`Retrieving key ${verKey}`);
-
-        const info = await env.IMAGES_NAMESPACE.get(verKey, { type: "arrayBuffer" });
-        if (info) { 
-            const data = extractPayload(info).payload as shardInfo;
-            if (DEBUG2) console.log("got blob data / metadata:", data)
-            verification_token = data.verification_token;
-        } else {
-            return returnError(request, ANONYMOUS_CANNOT_CONNECT_MSG);
-        }
-
+        // now we can get actual shard
+        const key = genKey('_', data.id)
         const stored_data = await env.IMAGES_NAMESPACE.get(key, { type: "arrayBuffer" });
         var assembled_data
         if (stored_data == null) {
             if (DEBUG) console.log("======== data was new")
-
-            // verification_token = crypto.getRandomValues(new Uint16Array(4)).buffer; // TODO - fetch from meta data
-            // data['verification_token'] = verification_token;
-            
-            assembled_data = assemblePayload({
-                version: '3',
-                id: image_id,
-                iv: data.iv,
-                salt: data.salt,
-                size: val.byteLength,
-                type: '_',
-                verification_token: verification_token,
-                image: data.image
-            })
+            assembled_data = assemblePayload(infoToShard(info, data.data));
             if (!assembled_data)
-                return returnError(request, "[Internal Error] L247", 500)
-            const store_resp = await env.IMAGES_NAMESPACE.put(key, assembled_data);
+                return returnError(request, "[Internal Error]")
+            const store_resp = await env.IMAGES_NAMESPACE.put(key, assembled_data); // actual storing of new shard contents
             if (DEBUG) console.log("Generated and stored verification token:", data, store_resp)
         } else {
-            // const data = extractPayload(stored_data).payload as shardInfo;
-            if (DEBUG) console.log("======== data was deduplicated", data)
-            // TODO: anything we verify?
-            // verification_token = data.verification_token;
+            if (DEBUG) console.log("======== data was deduplicated")
+            // minimal sanity check
+            const stored_shard = extractPayload(stored_data).payload as SBObjectHandle;
+            if (stored_shard.id !== info.id) {
+                console.error("Stored shard ID mismatch:", stored_shard.id, info.id)
+                return returnError(request, ANONYMOUS_CANNOT_CONNECT_MSG)
+            }
         }
-        if (DEBUG) console.log("Extracted data: ", data)
 
-        // make sure token isn't used multiple times
-        // _ledger_resp.used = true;
-        serverToken.used = true;
         // to avoid race condition, we await response from ledger before storing
-        // const _put_resp = await env.LEDGER_NAMESPACE.put(_storage_token.token_hash, JSON.stringify(_ledger_resp));
-        const _put_resp = await env.LEDGER_NAMESPACE.put(_storage_token.token_hash, JSON.stringify(serverToken));
-        if (DEBUG) console.log("ledger response to clearing token (setting to 'used'):", _put_resp)
+        serverToken.used = true;
+        await env.LEDGER_NAMESPACE.put(serverToken.hash, JSON.stringify(serverToken));
 
-        // 2023.04.22: changed, uses '.' so it's reversible
-        const verification_token_string = new Uint16Array(verification_token).join('.')
-        // console.log("verification token string:")
-        // console.log(verification_token_string)
-        return returnResult(request, {
-            image_id: image_id,
-            size: val.byteLength,
-            verification_token: verification_token_string,
-            ledger_resp: _put_resp
-        });
+        // const verification_string = new Uint16Array(info.verification).join('.')
+        return returnResultJson(request, info);
     } catch (err) {
-        return returnError(request, `[handleStoreData] ${err}`, 500)
+        console.error(err)
+        return returnError(request, "[Internal Error]")
     }
 }
 
+// '/api/v2/fetchData': fetches the full shard
 async function handleFetchData(request: Request, env: EnvType) {
+    // this endpoint is the only one that looks at searchParams
     const { searchParams } = new URL(request.url)
-    const verification_token = searchParams.get('verification_token')
-    // let type = searchParams.get('type') || 'p' // defaults to 'p'
-    let type = searchParams.get('type') || '_'; // new default
-    // const storage_token = searchParams.get('storage_token');
     const id = searchParams.get('id');
-    if (!verification_token || !id) {
-        if (DEBUG) console.log("we received:", id, verification_token, type)
-        return returnError(request, "you need verification_token/id/type")
+    const verification = searchParams.get('verification')
+    const type = searchParams.get('type') || '_'; // new default
+    if (!id || !verification) {
+        if (DEBUG) console.log("we received:", id, verification, type)
+        return returnError(request, "you need verification/id/type")
     }
+    if (DEBUG) console.log("fetching data for:", id, verification, type)
     // we first check verification id, against 'T' entry
     const verKey = genKey('T', id)
     const stored_ver_data = await env.IMAGES_NAMESPACE.get(verKey, { type: "arrayBuffer" })
     if (!stored_ver_data) {
-        return returnError(request, `object not found (error?) (key: ${verKey})`, 404)
+        if (DEBUG) console.error("object not found (error?) (key: ", verKey, ")")
+        return returnError(request, ANONYMOUS_CANNOT_CONNECT_MSG)
     } else {
-        const data = extractPayload(stored_ver_data).payload as shardInfo
-        if (DEBUG2) {
+        const data = extractPayload(stored_ver_data).payload as SBObjectHandle
+        if (DEBUG) {
             console.log("Stored data", stored_ver_data);
             console.log("Parsed stored:", data)
         }
-        if (DEBUG) console.log("Parsed token:", data.verification_token)
-        if (verifyToken(verification_token, data.verification_token) === false) {
-            if (DEBUG2) {
-                console.log("verification failed; received:", verification_token)
-                console.log("expected:", data.verification_token)
+        if (DEBUG) console.log("Parsed token:", data.verification)
+        if (verification !== data.verification) {
+            if (DEBUG) {
+                console.log("verification failed; received:", verification)
+                console.log("expected:", data.verification)
             }
-            // TODO: update these error messages to be ANONYMOUS
-            return returnError(request, "verification failed", 401)
+            return returnError(request, ANONYMOUS_CANNOT_CONNECT_MSG)
         }
         // else we fall through and get the object
     }
 
     const key = genKey(type, id)
     if (DEBUG) console.log("looking up:", key);
-    const stored_data = await env.IMAGES_NAMESPACE.get(key, { type: "arrayBuffer" })
-    if (!stored_data) {
-        return returnError(request, `object not found (error?) (key: ${key})`, 404)
-    } else {
-        return returnBinaryResult(request, stored_data);
+    const storedData = await env.IMAGES_NAMESPACE.get(key, { type: "arrayBuffer" })
+    if (!storedData) return returnError(request, ANONYMOUS_CANNOT_CONNECT_MSG)
+    if (DEBUG) {
+        // double-checking object
+        const data = extractPayload(storedData).payload as Shard
+        console.log("Stored data", storedData);
+        if (!validate_ShardOrInfo(data)) {
+            console.error("Failed to validate stored shard:", data)
+            return returnError(request, "[Internal Error]")
+        }
     }
+    if (DEBUG) console.log("++++ handling fetch data done - returning data ++++")
+    return returnBinaryResult(request, storedData);
 }
 
-
-
-async function verifyStorage(data: ArrayBuffer, id: string | null, _env: EnvType, _ledger_resp: SBStorageToken) {
-    // const dataHash = await generateDataHash(data['image']);
-    // const dataHash = await generateDataHash(data);
+async function verifyStorageToken(data: ArrayBuffer, id: string, _env: EnvType, _ledger_resp: SBStorageToken) {
     const digest = await crypto.subtle.digest('SHA-256', data);
-    // return encodeURIComponent(arrayBufferToBase64(digest));
     const dataHash = arrayBufferToBase62(digest);
-
     if (!dataHash || !id) return false;
     if (id.slice(-dataHash.length) !== dataHash) return false;
-    // if (!_ledger_resp || _ledger_resp.used || _ledger_resp.size !== data.image.byteLength) return false;
     if (!_ledger_resp || _ledger_resp.used || _ledger_resp.size !== data.byteLength) return false;
     return true;
 }
-
-async function handleMigrateStorage(request: Request, _env: EnvType) {
-    return returnError(request, "This endpoint is on hold", 401)
-}
-
-async function handleFetchDataMigration(request: Request, env: EnvType) {
-    return returnError(request, "This endpoint is on hold", 401)
-    // const { searchParams } = new URL(request.url);
-    // const verification_token = searchParams.get('verification_token');
-    // // const storage_token = searchParams.get('storage_token');
-    // const id = searchParams.get('id');
-    // const type = searchParams.get('type')
-    // if (!id || !type) return returnError(request, "you need id and type")
-    // const key = genKey(type, id)
-    // const stored_data = await env.IMAGES_NAMESPACE.get(key, { type: "arrayBuffer" });
-    // if (DEBUG2) console.log("Stored data", stored_data)
-    // if (stored_data == null)
-    //     return returnError(request, "Could not find data", 401)
-    // const data = extractPayload(stored_data);
-    // // const storage_resp = await (await fetch('https://s_socket.privacy.app/api/token/' + storage_token + '/checkUsage')).json();
-    // if (verification_token !== new Uint16Array(data.verification_token).join(''))
-    //     return returnError(request, 'Verification failed', 401)
-    // const payload = assemblePayload(data);
-    // if (!payload)
-    //     return returnError(request, "could not assemble payload (data migration) (?)")
-    // return returnBinaryResult(request, payload);
-}``

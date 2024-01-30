@@ -8,3 +8,7 @@
 
 - using type 'T' for token (meta data)
 
+- changed format for '/storeRequest' to be 'id' not 'key'
+
+- using 'id' everywhere now instead of 'name'
+
