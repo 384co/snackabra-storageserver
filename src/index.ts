@@ -23,72 +23,95 @@
 
 import type { EnvType } from './env'
 import { DEBUG, DEBUG2 } from './env'
-import { _sb_assert, returnResult, returnBinaryResult, returnError, handleErrors, } from './workers'
+import { _sb_assert, returnResult, returnResultJson,
+    returnBinaryResult, returnError, getServerStorageToken, ANONYMOUS_CANNOT_CONNECT_MSG } from './workers'
 
 if (DEBUG) console.log("++++ channel server code loaded ++++ DEBUG is enabled ++++")
 if (DEBUG2) console.log("++++ DEBUG2 (verbose) enabled ++++")
 
-import type { SBPayload } from 'snackabra'
-import { assemblePayload, extractPayload, arrayBufferToBase64 } from 'snackabra'
+// import type { SBPayload } from 'snackabra'
+import { assemblePayload, extractPayload, arrayBufferToBase62, SBStorageToken } from 'snackabra'
 
-export default {
-    async fetch(request: Request, env: EnvType) {
-        if (DEBUG) {
-            console.log(`==== [${request.method}] Fetch called: ${request.url}`);
-            if (DEBUG2) console.log(request.headers);
-        }
-        return await handleErrors(request, async () => {
-            return handleRequest(request, env);
-        });
-    }
-}
+export { default } from './workers'
 
-async function handleRequest(request: Request, env: EnvType) {  // not using ctx
+// export default {
+//     async fetch(request: Request, env: EnvType) {
+//         if (DEBUG) {
+//             console.log(`==== [${request.method}] Fetch called: ${request.url}`);
+//             if (DEBUG3) console.log(request.headers);
+//         }
+//         return await handleErrors(request, async () => {
+//             return handleRequest(request, env);
+//         });
+//     }
+// }
+
+// async function handleRequest(request: Request, env: EnvType) {  // not using ctx
+//     try {
+//         if (DEBUG2) console.log(request)
+//         let options: any = {}
+//         if (DEBUG) {
+//             // customize caching
+//             options.cacheControl = {
+//                 bypassCache: true,
+//             };
+//         }
+//         const { method, url } = request
+//         const { pathname } = new URL(url)
+//         if (method === "OPTIONS") {
+//             return handleOptions(request)
+//         } else if (pathname.split('/')[1] === 'api') {
+//             return await handleApiCall(request, env)
+//         } else if (pathname === '/.well-known/apple-app-site-association') {
+//             return universalLinkFile(request);
+//         } else {
+//             return returnError(request, `'${pathname}' Not found`, 404, 50)
+//         }
+//     } catch (err) {
+//         return returnError(request, `[handleRequest] ]${err}`, 404)
+//     }
+// }
+
+// async function handleApiCall(request: Request, env: EnvType) {
+//     const { pathname } = new URL(request.url);
+//     const fname = pathname.split('/')[3];
+//     if (DEBUG) console.log("handleApiCall() fname:", fname)
+//     try {
+//         switch (fname) {
+
+//             default:
+//                 return returnError(request, `Endpoint '${fname}' not understood`, 404)
+//         }
+//     } catch (err) {
+//         return returnError(request, `[${fname}] {err}`)
+//     }
+// }
+
+// function handleOptions(request: Request) {
+//     if (request.headers.get("Origin") !== null &&
+//         request.headers.get("Access-Control-Request-Method") !== null &&
+//         request.headers.get("Access-Control-Request-Headers") !== null) {
+//         return returnResult(request, null)
+//     } else {
+//         // Handle standard OPTIONS request.
+//         return new Response(null, {
+//             headers: {
+//                 "Allow": "POST, OPTIONS",
+//             }
+//         })
+//     }
+// }
+
+
+
+// 'path' is the request path, starting AFTER '/api/v2'
+export async function handleApiRequest(path: Array<string>, request: Request, env: EnvType) {
     try {
-        if (DEBUG2) console.log(request)
-        let options: any = {}
-        if (DEBUG) {
-            // customize caching
-            options.cacheControl = {
-                bypassCache: true,
-            };
-        }
-        const { method, url } = request
-        const { pathname } = new URL(url)
-        if (method === "OPTIONS") {
-            return handleOptions(request)
-        } else if (pathname.split('/')[1] === 'api') {
-            return await handleApiCall(request, env)
-        } else if (pathname === '/.well-known/apple-app-site-association') {
-            return universalLinkFile(request);
-        } else {
-            return returnError(request, `'${pathname}' Not found`, 404, 50)
-        }
-    } catch (err) {
-        return returnError(request, `[handleRequest] ]${err}`, 404)
-    }
-}
-
-function handleOptions(request: Request) {
-    if (request.headers.get("Origin") !== null &&
-        request.headers.get("Access-Control-Request-Method") !== null &&
-        request.headers.get("Access-Control-Request-Headers") !== null) {
-        return returnResult(request, null)
-    } else {
-        // Handle standard OPTIONS request.
-        return new Response(null, {
-            headers: {
-                "Allow": "POST, OPTIONS",
-            }
-        })
-    }
-}
-
-async function handleApiCall(request: Request, env: EnvType) {
-    const { pathname } = new URL(request.url);
-    const fname = pathname.split('/')[3];
-    try {
-        switch (fname) {
+        switch (path[0]) {
+            case 'info':
+                return returnResultJson(request, {
+                    version: env.VERSION,
+                })
             case 'storeRequest':
                 return await handleStoreRequest(request, env)
             case 'storeData':
@@ -102,47 +125,129 @@ async function handleApiCall(request: Request, env: EnvType) {
             case 'robots.txt':
                 return returnResult(request, "Disallow: /");
             default:
-                return returnError(request, `Endpoint '${fname}' not understood`, 404)
+                return returnError(request, "Not found (this is an API endpoint, the URI was malformed)", 404)
         }
-    } catch (err) {
-        return returnError(request, `[${fname}] {err}`)
+    } catch (error: any) {
+        return returnError(request, `[API Error] [${request.url}]: \n` + error.message + '\n' + error.stack, 500);
     }
 }
+
+interface shardInfo {
+    version: '3',
+    id: string,
+    iv: Uint8Array,
+    salt: ArrayBuffer,
+    size: number,
+    type: string,
+    verification_token: ArrayBuffer,
+}
+
+// // given half an object identifier, return (salt, iv) to use for next step
+// async function handleStoreRequest(request: Request, env: EnvType) {
+//     if (DEBUG2) console.log("handleStoreRequest()")
+//     const { searchParams } = new URL(request.url);
+//     const name = searchParams.get('name');
+//     const type = searchParams.get('type') ?? '_'; // new default, shifting to deprecating
+//     if (!name) return returnError(request, "you need name (ID)")
+//     if (DEBUG2) console.log(`prefix name: ${genKey(type, name)}`)
+//     const list_resp = await env.IMAGES_NAMESPACE.list({ 'prefix': genKey(type, name) });
+//     let data: any = {};
+//     if (list_resp.keys.length > 0) {
+//         if (DEBUG) console.log("found object")
+//         const key = list_resp.keys[0].name;
+//         const val = await env.IMAGES_NAMESPACE.get(key, { type: "arrayBuffer" });
+//         if (!val)
+//             return returnError(request, "could not find object", 401)
+//         data = extractPayload(val);
+//     } else {
+//         if (DEBUG) console.log("did NOT find object")
+//     }
+//     if (DEBUG2) console.log("got blob data:", data)
+
+//     // convoluted but safer way of getting salt and iv properties
+//     const salt = Object.prototype.hasOwnProperty.call(data, 'salt') ? data['salt'] : crypto.getRandomValues(new Uint8Array(16));
+//     const iv = Object.prototype.hasOwnProperty.call(data, 'iv') ? data['iv'] : crypto.getRandomValues(new Uint8Array(12));
+
+//     return returnResult(request, { iv: iv, salt: salt });
+// }
+
+
+// async function handleStoreRequest(request: Request, env: EnvType) {
+//     if (DEBUG2) console.log("handleStoreRequest()")
+//     const { searchParams } = new URL(request.url);
+//     const name = searchParams.get('name');
+//     if (!name) return returnError(request, "you need name (ID)")
+//     if (DEBUG2) console.log(`prefix name: ${genKey('T', name)}`)
+
+//     const list_resp = await env.IMAGES_NAMESPACE.list({ 'prefix': genKey('T', name) });
+//     let data: any = {};
+//     if (list_resp.keys.length > 0) {
+//         if (DEBUG) console.log("found object")
+//         const key = list_resp.keys[0].name;
+//         const val = await env.IMAGES_NAMESPACE.get(key, { type: "arrayBuffer" });
+//         if (!val)
+//             return returnError(request, "could not find object", 401)
+//         data = extractPayload(val);
+//     } else {
+//         if (DEBUG) console.log("did NOT find object")
+//     }
+//     if (DEBUG2) console.log("got blob data:", data)
+
+//     // convoluted but safer way of getting salt and iv properties
+//     const salt = Object.prototype.hasOwnProperty.call(data, 'salt') ? data['salt'] : crypto.getRandomValues(new Uint8Array(16));
+//     const iv = Object.prototype.hasOwnProperty.call(data, 'iv') ? data['iv'] : crypto.getRandomValues(new Uint8Array(12));
+
+//     return returnResult(request, { iv: iv, salt: salt });
+// }
 
 async function handleStoreRequest(request: Request, env: EnvType) {
     if (DEBUG2) console.log("handleStoreRequest()")
     const { searchParams } = new URL(request.url);
     const name = searchParams.get('name');
-    const type = searchParams.get('type');
-    if (!name || !type)
-        return returnError(request, "you need name/type")
-    if (DEBUG2) console.log(`prefix name: ${genKey(type, name)}`)
-    const list_resp = await env.IMAGES_NAMESPACE.list({ 'prefix': genKey(type, name) });
-    let data: any = {};
-    if (list_resp.keys.length > 0) {
-        if (DEBUG) console.log("found object")
-        const key = list_resp.keys[0].name;
-        const val = await env.IMAGES_NAMESPACE.get(key, { type: "arrayBuffer" });
-        if (!val)
-            return returnError(request, "could not find object", 401)
-        data = extractPayload(val);
-    } else {
-        if (DEBUG) console.log("did NOT find object")
-    }
-    if (DEBUG2) console.log("got blob data:", data)
-    const salt = Object.prototype.hasOwnProperty.call(data, 'salt') ? data['salt'] : crypto.getRandomValues(new Uint8Array(16));
-    const iv = Object.prototype.hasOwnProperty.call(data, 'iv') ? data['iv'] : crypto.getRandomValues(new Uint8Array(12));
-    // subtle not doing this:
-    // const salt = data.hasOwnProperty('salt') ? data.salt : crypto.getRandomValues(new Uint8Array(16));
-    // const iv = data.hasOwnProperty('iv') ? data.iv : crypto.getRandomValues(new Uint8Array(12));
+    if (!name) return returnError(request, "you need name (ID)")
+    // TODO: add TTL in handleStoreRequest()
 
-    const return_data = { iv: iv, salt: salt };
-    if (DEBUG2) console.log('handleStoreRequest returning:', return_data)
-    const payload = assemblePayload(return_data);
-    if (!payload)
-        return returnError(request, "could not assemble payload")
-    return returnBinaryResult(request, payload);
+    const key = genKey('T', name);
+    if (DEBUG2) console.log(`Retrieving key ${key}`);
+
+    const val = await env.IMAGES_NAMESPACE.get(key, { type: "arrayBuffer" });
+    if (val) { 
+        const data = extractPayload(val).payload as shardInfo;
+        if (DEBUG2) console.log("got blob data / metadata:", data)
+        return returnResult(request, { iv: data.iv, salt: data.salt });
+    } else {
+        // new object, create new salt and iv and store it to KV
+        const salt = crypto.getRandomValues(new Uint8Array(16));
+        const iv = crypto.getRandomValues(new Uint8Array(12));
+        const data: shardInfo = {
+            version: '3',
+            id: name,
+            iv: iv,
+            salt: salt,
+            size: -1, // indicates unknown
+            type: 'T',
+            verification_token: crypto.getRandomValues(new Uint16Array(4)).buffer,
+        }
+        const assembled_data = assemblePayload(data);
+        if (!assembled_data)
+            return returnError(request, "[Internal Error] L235", 500)
+        if (DEBUG) console.log("writing shard info back to type 'T'", key, data)
+
+        // privacy window is set to 14 days (with a random jitter of 10%)
+        var ttl = 14 * 24 * 60 * 60; // in seconds
+        ttl += (Math.random() - 0.5) * 0.2 * ttl;
+
+        const resp = await env.IMAGES_NAMESPACE.put(key, assembled_data, { expirationTtl: ttl });
+        if (resp !== null) {
+            if (DEBUG) console.log("Stored new salt and iv:", data)
+            return returnResult(request, { iv: iv, salt: salt });
+        } else {
+            if (DEBUG) console.error("Failed to store new salt and iv:", resp)
+            return returnError(request, "Internal Error [L249]");
+        }
+    }
 }
+
 
 function genKey(type: string, id: string) {
     const key = "____" + type + "__" + id + "______"
@@ -164,199 +269,191 @@ function verifyToken(verification_token: string, stored_verification_token: Arra
     }
 }
 
+// performs actual storage
 async function handleStoreData(request: Request, env: EnvType) {
-    console.log("==== handleStoreData()")
-    const { searchParams } = new URL(request.url);
-    const image_id = searchParams.get('key')
-    const type = searchParams.get('type')
-    if (!image_id || !type) return returnError(request, "missing 'key' or 'type'")
-    const key = genKey(type, image_id)
-    const val = await request.arrayBuffer();
-    const data = extractPayload(val);
-    if (DEBUG2) {
-        console.log("searchParams:", searchParams)
-        console.log("image_id:", image_id)
-        console.log("key / env.key:", key, await env.IMAGES_NAMESPACE.get(key))
-        console.log("EXTRACTED DATA IN MAIN: ", Object.keys(data))
-        console.log("storageToken processing:", data.storageToken)
-    }
-    let verification_token: ArrayBufferLike;
-    const _storage_token = JSON.parse((new TextDecoder).decode(data.storageToken));
-    if ('error' in _storage_token)
-        return returnResult(request, JSON.stringify(_storage_token), 401);
-    let _storage_token_hash = await env.LEDGER_NAMESPACE.get(_storage_token.token_hash);
-    let _ledger_resp = _storage_token_hash ? JSON.parse(_storage_token_hash) || {} : {};
-    if (DEBUG2) console.log("tokens: ", _ledger_resp, _storage_token)
-    if (!verifyStorage(data, image_id, env, _ledger_resp))
-        return returnError(request, 'Ledger(s) refused storage request - authentication or storage budget issue, or malformed request', 500, 50);
-    const stored_data = await env.IMAGES_NAMESPACE.get(key, { type: "arrayBuffer" });
-    if (stored_data == null) {
-        if (DEBUG2) console.log("======== data was new")
-        verification_token = crypto.getRandomValues(new Uint16Array(4)).buffer;
-        data['verification_token'] = verification_token;
-        const assembled_data = assemblePayload(data) as ArrayBuffer; // 2.0 will always return ArrayBuffer
-        if (!assembled_data)
-            return returnError(request, "could not assemble payload (to put into KV)")
-        if (DEBUG2) console.log("assembled data", assembled_data)
-        const store_resp = await env.IMAGES_NAMESPACE.put(key, assembled_data);
-        if (DEBUG2) console.log("Generated and stored verification token:", verification_token, store_resp)
-    } else {
-        const data = extractPayload(stored_data);
-        if (DEBUG2) {
-            console.log("======== data was deduplicated", data)
-            console.log("found verification token:", data.verification_token)
+    if (DEBUG) console.log("==== handleStoreData()")
+    try {
+        const { searchParams } = new URL(request.url);
+        const image_id = searchParams.get('key')
+        if (!image_id) return returnError(request, "missing 'key'")
+        const key = genKey('_', image_id)
+        const val = await request.arrayBuffer();
+        const data = extractPayload(val).payload;
+
+        if (DEBUG) {
+            console.log("image_id:", image_id)
+            console.log("key / env.key:", key, await env.IMAGES_NAMESPACE.get(key))
+            console.log("EXTRACTED DATA IN MAIN: ", Object.keys(data))
+            console.log("storageToken processing:", data.storageToken)
+            console.log(data.image)
         }
-        verification_token = data.verification_token;
+
+        let verification_token: ArrayBufferLike;
+        // const _storage_token = JSON.parse((new TextDecoder).decode(data.storageToken));
+        const _storage_token = data.storageToken;
+
+        const serverToken = await getServerStorageToken(_storage_token.hash, env)
+        if (!serverToken) {
+          if (DEBUG) console.error(`ERROR **** Having issues processing storage token '${_storage_token.hash}'`)
+          return returnError(request, ANONYMOUS_CANNOT_CONNECT_MSG, 401);
+        }
+        if (DEBUG) console.log("tokens: ", serverToken)
+
+        if (!verifyStorage(data, image_id, env, serverToken)) {
+            if (DEBUG) console.error('Ledger(s) refused storage request - authentication or storage budget issue, or malformed request')
+            return returnError(request, ANONYMOUS_CANNOT_CONNECT_MSG);
+        }
+
+        // we now get the meta data on the object
+
+        const verKey = genKey('T', image_id);
+        if (DEBUG2) console.log(`Retrieving key ${verKey}`);
+
+        const info = await env.IMAGES_NAMESPACE.get(verKey, { type: "arrayBuffer" });
+        if (info) { 
+            const data = extractPayload(info).payload as shardInfo;
+            if (DEBUG2) console.log("got blob data / metadata:", data)
+            verification_token = data.verification_token;
+        } else {
+            return returnError(request, ANONYMOUS_CANNOT_CONNECT_MSG);
+        }
+
+        const stored_data = await env.IMAGES_NAMESPACE.get(key, { type: "arrayBuffer" });
+        var assembled_data
+        if (stored_data == null) {
+            if (DEBUG) console.log("======== data was new")
+
+            // verification_token = crypto.getRandomValues(new Uint16Array(4)).buffer; // TODO - fetch from meta data
+            // data['verification_token'] = verification_token;
+            
+            assembled_data = assemblePayload({
+                version: '3',
+                id: image_id,
+                iv: data.iv,
+                salt: data.salt,
+                size: val.byteLength,
+                type: '_',
+                verification_token: verification_token,
+                image: data.image
+            })
+            if (!assembled_data)
+                return returnError(request, "[Internal Error] L247", 500)
+            const store_resp = await env.IMAGES_NAMESPACE.put(key, assembled_data);
+            if (DEBUG) console.log("Generated and stored verification token:", data, store_resp)
+        } else {
+            // const data = extractPayload(stored_data).payload as shardInfo;
+            if (DEBUG) console.log("======== data was deduplicated", data)
+            // TODO: anything we verify?
+            // verification_token = data.verification_token;
+        }
+        if (DEBUG) console.log("Extracted data: ", data)
+
+        // make sure token isn't used multiple times
+        // _ledger_resp.used = true;
+        serverToken.used = true;
+        // to avoid race condition, we await response from ledger before storing
+        // const _put_resp = await env.LEDGER_NAMESPACE.put(_storage_token.token_hash, JSON.stringify(_ledger_resp));
+        const _put_resp = await env.LEDGER_NAMESPACE.put(_storage_token.token_hash, JSON.stringify(serverToken));
+        if (DEBUG) console.log("ledger response to clearing token (setting to 'used'):", _put_resp)
+
+        // 2023.04.22: changed, uses '.' so it's reversible
+        const verification_token_string = new Uint16Array(verification_token).join('.')
+        // console.log("verification token string:")
+        // console.log(verification_token_string)
+        return returnResult(request, {
+            image_id: image_id,
+            size: val.byteLength,
+            verification_token: verification_token_string,
+            ledger_resp: _put_resp
+        });
+    } catch (err) {
+        return returnError(request, `[handleStoreData] ${err}`, 500)
     }
-    if (DEBUG2) console.log("Extracted data: ", data)
-
-    // make sure token isn't used multiple times
-    _ledger_resp.used = true;
-    // to avoid race condition, we await response from ledger before storing
-    const _put_resp = await env.LEDGER_NAMESPACE.put(_storage_token.token_hash, JSON.stringify(_ledger_resp));
-    if (DEBUG2) console.log("ledger response to clearing token (setting to 'used'):", _put_resp)
-
-    // we no longer need recovery namespace since we are using permanent storage
-    // env.RECOVERY_NAMESPACE.put(_storage_token.hashed_room_id + '_' + _storage_token.encrypted_token_id, 'true');
-    // env.RECOVERY_NAMESPACE.put(_storage_token.token_hash + '_' + image_id, 'true');
-    // env.RECOVERY_NAMESPACE.put(image_id + '_' + _storage_token.token_hash, 'true');
-    // await fetch('https://s_socket.privacy.app/api/token/' + new TextDecoder().decode(storageToken) + '/useToken');
-
-    // 2023.04.22: changed, uses '.' so it's reversible
-    const verification_token_string = new Uint16Array(verification_token).join('.')
-    // console.log("verification token string:")
-    // console.log(verification_token_string)
-    return returnResult(request, JSON.stringify({
-        image_id: image_id,
-        size: val.byteLength,
-        verification_token: verification_token_string,
-        ledger_resp: _put_resp
-    }));
 }
 
 async function handleFetchData(request: Request, env: EnvType) {
     const { searchParams } = new URL(request.url)
     const verification_token = searchParams.get('verification_token')
-    let type = searchParams.get('type') || 'p' // defaults to 'p'
+    // let type = searchParams.get('type') || 'p' // defaults to 'p'
+    let type = searchParams.get('type') || '_'; // new default
     // const storage_token = searchParams.get('storage_token');
     const id = searchParams.get('id');
-    if (!verification_token || !type || !id)
+    if (!verification_token || !id) {
+        if (DEBUG) console.log("we received:", id, verification_token, type)
         return returnError(request, "you need verification_token/id/type")
-    const key = genKey(type, id)
-    if (DEBUG2) console.log("looking up:", key);
-    const stored_data = await env.IMAGES_NAMESPACE.get(key, { type: "arrayBuffer" })
-    if (!stored_data) {
-        return returnError(request, `object not found (error?) (key: ${key})`, 404)
+    }
+    // we first check verification id, against 'T' entry
+    const verKey = genKey('T', id)
+    const stored_ver_data = await env.IMAGES_NAMESPACE.get(verKey, { type: "arrayBuffer" })
+    if (!stored_ver_data) {
+        return returnError(request, `object not found (error?) (key: ${verKey})`, 404)
     } else {
-        const data = extractPayload(stored_data)
+        const data = extractPayload(stored_ver_data).payload as shardInfo
         if (DEBUG2) {
-            console.log("Stored data", stored_data);
+            console.log("Stored data", stored_ver_data);
             console.log("Parsed stored:", data)
         }
         if (DEBUG) console.log("Parsed token:", data.verification_token)
-        // const storage_resp = await (await fetch('https://s_socket.privacy.app/api/token/' + storage_token + '/checkUsage')).json();
         if (verifyToken(verification_token, data.verification_token) === false) {
             if (DEBUG2) {
                 console.log("verification failed; received:", verification_token)
                 console.log("expected:", data.verification_token)
             }
+            // TODO: update these error messages to be ANONYMOUS
             return returnError(request, "verification failed", 401)
         }
-        const payload = assemblePayload(data);
-        if (!payload)
-            return returnError(request, "could not assemble payload (fetching data) (?)")
-        return returnBinaryResult(request, assemblePayload(data)! as ArrayBuffer);
+        // else we fall through and get the object
+    }
+
+    const key = genKey(type, id)
+    if (DEBUG) console.log("looking up:", key);
+    const stored_data = await env.IMAGES_NAMESPACE.get(key, { type: "arrayBuffer" })
+    if (!stored_data) {
+        return returnError(request, `object not found (error?) (key: ${key})`, 404)
+    } else {
+        return returnBinaryResult(request, stored_data);
     }
 }
 
-async function generateDataHash(data: BufferSource) {
-    try {
-        const digest = await crypto.subtle.digest('SHA-256', data);
-        return encodeURIComponent(arrayBufferToBase64(digest));
-    } catch (e) {
-        if (DEBUG) console.log("generateDataHash() error", e);
-        return null;
-    }
-}
 
-async function verifyStorage(data: SBPayload, id: string | null, _env: EnvType, _ledger_resp: any) {
-    const dataHash = await generateDataHash(data['image']);
+
+async function verifyStorage(data: ArrayBuffer, id: string | null, _env: EnvType, _ledger_resp: SBStorageToken) {
+    // const dataHash = await generateDataHash(data['image']);
+    // const dataHash = await generateDataHash(data);
+    const digest = await crypto.subtle.digest('SHA-256', data);
+    // return encodeURIComponent(arrayBufferToBase64(digest));
+    const dataHash = arrayBufferToBase62(digest);
+
     if (!dataHash || !id) return false;
     if (id.slice(-dataHash.length) !== dataHash) return false;
-    if (!_ledger_resp || _ledger_resp.used || _ledger_resp.size !== data.image.byteLength) return false;
+    // if (!_ledger_resp || _ledger_resp.used || _ledger_resp.size !== data.image.byteLength) return false;
+    if (!_ledger_resp || _ledger_resp.used || _ledger_resp.size !== data.byteLength) return false;
     return true;
 }
 
-function universalLinkFile(request: Request) {
-    let json = {
-        "applinks": {
-            "details": [
-                {
-                    // ToDo: update this
-                    "appIDs": ["BFX746944J.app.snackabra"],
-                    "components": [
-                        {
-                            "/": "*",
-                            "comment": "Matches any URL"
-                        }
-                    ]
-                }
-            ]
-        }
-    }
-    let file = new Blob([JSON.stringify(json)], { type: 'application/json' });
-    return returnBinaryResult(request, file)
-}
-
-async function handleMigrateStorage(request: Request, env: EnvType) {
-    if (DEBUG2) console.log("In handleMigrate");
-    let data = await request.arrayBuffer();
-    let jsonString = new TextDecoder().decode(data);
-    let json = JSON.parse(jsonString);
-    let targetURL = json['target'];
-    if (DEBUG2) console.log("TargetURL: ", targetURL)
-    delete json['target'];
-    if (!Object.prototype.hasOwnProperty.call(json, 'SERVER_SECRET') || !(json['SERVER_SECRET'] === env.SERVER_SECRET)) // yes you just need one '!'
-        return returnError(request, "Server verification failed", 401)
-    delete json['SERVER_SECRET']
-    for (let key in json) {
-        const key_parts = key.split(".");
-        const key_id = key_parts[0];
-        let type = key_parts[1];
-        if (type !== "p" && type !== "f")
-            type = "p";
-        let reqUrl = "https://" + targetURL + "/api/v1/fetchDataMigration?id=" + encodeURIComponent(key_id) + "&verification_token=" + json[key] + "&type=" + type;
-        let fetch_req = await fetch(reqUrl);
-        if (fetch_req.status === 500 && type !== "f") {
-            type = "f";
-            reqUrl = "https://" + targetURL + "/api/v1/fetchDataMigration?id=" + encodeURIComponent(key_id) + "&verification_token=" + json[key] + "&type=" + type;
-            fetch_req = await fetch(reqUrl);
-        }
-        let ab = await fetch_req.arrayBuffer();
-        const kv_key = genKey(type, key_id)
-        env.IMAGES_NAMESPACE.put(kv_key, ab);
-    }
-    return returnResult(request, JSON.stringify({ success: true }))
+async function handleMigrateStorage(request: Request, _env: EnvType) {
+    return returnError(request, "This endpoint is on hold", 401)
 }
 
 async function handleFetchDataMigration(request: Request, env: EnvType) {
-    const { searchParams } = new URL(request.url);
-    const verification_token = searchParams.get('verification_token');
-    // const storage_token = searchParams.get('storage_token');
-    const id = searchParams.get('id');
-    const type = searchParams.get('type')
-    if (!id || !type) return returnError(request, "you need id and type")
-    const key = genKey(type, id)
-    const stored_data = await env.IMAGES_NAMESPACE.get(key, { type: "arrayBuffer" });
-    if (DEBUG2) console.log("Stored data", stored_data)
-    if (stored_data == null)
-        return returnError(request, "Could not find data", 401)
-    const data = extractPayload(stored_data);
-    // const storage_resp = await (await fetch('https://s_socket.privacy.app/api/token/' + storage_token + '/checkUsage')).json();
-    if (verification_token !== new Uint16Array(data.verification_token).join(''))
-        return returnError(request, 'Verification failed', 401)
-    const payload = assemblePayload(data);
-    if (!payload)
-        return returnError(request, "could not assemble payload (data migration) (?)")
-    return returnBinaryResult(request, payload);
-}
+    return returnError(request, "This endpoint is on hold", 401)
+    // const { searchParams } = new URL(request.url);
+    // const verification_token = searchParams.get('verification_token');
+    // // const storage_token = searchParams.get('storage_token');
+    // const id = searchParams.get('id');
+    // const type = searchParams.get('type')
+    // if (!id || !type) return returnError(request, "you need id and type")
+    // const key = genKey(type, id)
+    // const stored_data = await env.IMAGES_NAMESPACE.get(key, { type: "arrayBuffer" });
+    // if (DEBUG2) console.log("Stored data", stored_data)
+    // if (stored_data == null)
+    //     return returnError(request, "Could not find data", 401)
+    // const data = extractPayload(stored_data);
+    // // const storage_resp = await (await fetch('https://s_socket.privacy.app/api/token/' + storage_token + '/checkUsage')).json();
+    // if (verification_token !== new Uint16Array(data.verification_token).join(''))
+    //     return returnError(request, 'Verification failed', 401)
+    // const payload = assemblePayload(data);
+    // if (!payload)
+    //     return returnError(request, "could not assemble payload (data migration) (?)")
+    // return returnBinaryResult(request, payload);
+}``

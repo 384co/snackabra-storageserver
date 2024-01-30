@@ -1,9 +1,9 @@
-export const VERSION = "2.0.0 (pre) (build 06)"
 export const DEBUG = true;
 export const DEBUG2 = false;
 
 // this section has some type definitions that helps us with CF types
 export type EnvType = {
+    VERSION: string,
     // ChannelServerAPI
     channels: DurableObjectNamespace,
     // used for worker-to-worker (see toml)
