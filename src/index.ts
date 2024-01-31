@@ -71,13 +71,14 @@ export async function handleApiRequest(path: Array<string>, request: Request, en
 // format of shards at rest
 
 // shardInfo is the metadata for a shard, stored separately as a special entry
-// of type 'T' in the KV store (the 'type' in the interface is for the shard)
+// of type 'T' in the KV store (the 'type' in the interface is for the shard).
+// note that 'type' is now shard info only, and not stored with shard
 interface ShardInfo {
     version: '3',
     id: Base62Encoded,
     iv: Uint8Array,
     salt: ArrayBuffer,
-    type: string, // if absent defaults to '_' (underscore)
+    type: string,
     verification: string,
 }
 
@@ -87,7 +88,6 @@ interface Shard {
     id: Base62Encoded,
     iv: Uint8Array,
     salt: ArrayBuffer,
-    type: string, // single character, defaults to '_'
     actualSize: number, // of the data in the shard
     data: ArrayBuffer,
 }
@@ -102,8 +102,7 @@ function validate_ShardOrInfo(s: Shard | ShardInfo): boolean {
         s.version === '3'
         && (typeof s.id === 'string' && s.id.length === 43 && b62regex.test(s.id))
         && (s.iv instanceof Uint8Array && s.iv.byteLength === 12)
-        && (s.salt instanceof ArrayBuffer && s.salt.byteLength === 16)
-        && (typeof s.type === 'string' && s.type.length === 1))) return false;
+        && (s.salt instanceof ArrayBuffer && s.salt.byteLength === 16))) return false;
     else if ('verification' in s)
         // strictly speaking we should verify that the individual numbers are within 16-bit range
         return (s.verification.split('.').map(num => parseInt(num, 10)).join('.') === s.verification)
@@ -132,7 +131,6 @@ function infoToShard(info: ShardInfo, data: ArrayBuffer): Shard {
         id: info.id,
         iv: info.iv,
         salt: info.salt,
-        type: info.type ?? '_',
         actualSize: data.byteLength,
         data: data,
     }
@@ -142,7 +140,7 @@ function infoToShard(info: ShardInfo, data: ArrayBuffer): Shard {
 // it returns the handle (note, in stringified form)
 async function getShardInfo(id: string, env: EnvType): Promise<ShardInfo | null> {
     if (!id) throw new Error("getShardInfo() called without id")
-    const key = genKey('T', id);
+    const key = genKey(id, 'T');
     if (DEBUG2) console.log(`Retrieving 'T' key ${key}`);
     const val = await env.IMAGES_NAMESPACE.get(key, { type: "arrayBuffer" });
     if (val) { 
@@ -212,12 +210,12 @@ async function handleStoreRequest(request: Request, env: EnvType) {
     }
 }
 
-function genKey(type: string, id: string) {
+function genKey(id: string, type: string = '_') {
+    _sb_assert(type.length === 1, "genKey() called with type length != 1")
     const key = "____" + type + "__" + id + "______"
     if (DEBUG2) console.log(`genKey(): '${key}'`)
     return key
 }
-
 
 // '/api/v2/storeData': performs actual storage
 async function handleStoreData(request: Request, env: EnvType) {
@@ -249,7 +247,7 @@ async function handleStoreData(request: Request, env: EnvType) {
         if (!info) return returnError(request, "[Internal Error]")
 
         // now we can get actual shard
-        const key = genKey('_', data.id)
+        const key = genKey(data.id)
         const stored_data = await env.IMAGES_NAMESPACE.get(key, { type: "arrayBuffer" });
         var assembled_data
         if (stored_data == null) {
@@ -287,14 +285,13 @@ async function handleFetchData(request: Request, env: EnvType) {
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id');
     const verification = searchParams.get('verification')
-    const type = searchParams.get('type') || '_'; // new default
     if (!id || !verification) {
-        if (DEBUG) console.log("we received:", id, verification, type)
+        if (DEBUG) console.log("we received:", id, verification)
         return returnError(request, "you need verification/id/type")
     }
-    if (DEBUG) console.log("fetching data for:", id, verification, type)
+    if (DEBUG) console.log("fetching data for:", id, verification)
     // we first check verification id, against 'T' entry
-    const verKey = genKey('T', id)
+    const verKey = genKey(id, 'T')
     const stored_ver_data = await env.IMAGES_NAMESPACE.get(verKey, { type: "arrayBuffer" })
     if (!stored_ver_data) {
         if (DEBUG) console.error("object not found (error?) (key: ", verKey, ")")
@@ -316,7 +313,7 @@ async function handleFetchData(request: Request, env: EnvType) {
         // else we fall through and get the object
     }
 
-    const key = genKey(type, id)
+    const key = genKey(id)
     if (DEBUG) console.log("looking up:", key);
     const storedData = await env.IMAGES_NAMESPACE.get(key, { type: "arrayBuffer" })
     if (!storedData) return returnError(request, ANONYMOUS_CANNOT_CONNECT_MSG)
