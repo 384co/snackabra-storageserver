@@ -272,7 +272,7 @@ async function handleStoreData(request: Request, env: EnvType) {
         await env.LEDGER_NAMESPACE.put(serverToken.hash, JSON.stringify(serverToken));
 
         // const verification_string = new Uint16Array(info.verification).join('.')
-        return returnResultJson(request, info);
+        return returnResult(request, info);
     } catch (err) {
         console.error(err)
         return returnError(request, "[Internal Error]")
