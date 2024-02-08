@@ -20,11 +20,10 @@
 
 */
 
-
 import type { EnvType } from './env'
 import { _sb_assert, returnResult, returnResultJson,
     returnBinaryResult, returnError, getServerStorageToken,
-    ANONYMOUS_CANNOT_CONNECT_MSG } from './workers'
+    ANONYMOUS_CANNOT_CONNECT_MSG, genKey } from './workers'
 
 // import type { SBPayload } from 'snackabra'
 import { assemblePayload, extractPayload, arrayBufferToBase62, base62ToArrayBuffer,
@@ -202,19 +201,12 @@ async function handleStoreRequest(request: Request, env: EnvType) {
     console.log("id:", id)
     // TODO: add TTL in handleStoreRequest()
     const data = await getShardInfo(id, env);
-    if (data)
+    if (data) {
         return returnResult(request, { iv: data.iv, salt: data.salt });
-    else {
+    } else {
         console.error("[203] Failed to get shard info for:", id)
         return returnError(request, "[Internal Error]")
     }
-}
-
-function genKey(id: string, type: string = '_') {
-    _sb_assert(type.length === 1, "genKey() called with type length != 1")
-    const key = "____" + type + "__" + id + "______"
-    if (DEBUG2) console.log(`genKey(): '${key}'`)
-    return key
 }
 
 // '/api/v2/storeData': performs actual storage
