@@ -7,6 +7,9 @@
 Snackabra Storage Server
 ========================
 
+_Note: this is deprecated or change in places, Cloudlfare has made it much
+simpler to run workerd locally. Hope to updated this soon._
+
 For general documentation on Snackabra see:
 
 * https://snackabra.io
@@ -101,27 +104,16 @@ in addition to what's shared with the room server:
 ::
 
    wrangler kv:namespace create "IMAGES_NAMESPACE"
-   wrangler kv:namespace create "RECOVERY_NAMESPACE"
 
 For each of them, you need to copy-paste the corresponding 'id' to
 your ``wrangler.toml`` file.
-
-Finally, you need to make a tiny change to your copy of
-the server code, providing a 'secret'. This is essentially a simple
-auth token that your server will request every time you create a new
-room, or migrate a room over from somewhere else.
-
-::
-
-   wrangler secret put SERVER_SECRET<enter>
-
-It will prompt you to enter the secret.
 
 Now you should be able to start your server:
 
 ::
 
-   wrangler publish
+   wrangler deploy
+
 
 And point a client to it. (Note: you currently cannot run ``wrangler dev``, because
 CF Durable Objects are not yet supported in preview mode.)
