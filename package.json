@@ -1,7 +1,7 @@
 {
   "name": "snackabra-storageserver",
   "author": "Magnusson Institute",
-  "email" : "snackabra@gmail.com",
+  "email": "snackabra@gmail.com",
   "description": "Snackabra Storage Server",
   "version": "2.0.0 (pre)",
   "bugs": "https://github.com/snackabra/snackabra-storageserver/issues",

@@ -48,6 +48,7 @@ export async function handleApiRequest(path: Array<string>, request: Request, en
             case 'info':
                 return returnResultJson(request, {
                     version: env.VERSION,
+                    motd: 'hello from alpha v3'
                 })
             case 'storeRequest':
                 return await handleStoreRequest(request, env)
@@ -224,7 +225,7 @@ async function handleStoreData(request: Request, env: EnvType) {
 
         const serverToken = await getServerStorageToken(data.storageToken.hash, env)
         if (!serverToken) {
-          console.error('[handleStoreData] Having issues processing storage token, did not receive anything from using', data.storageToken)
+          console.error('[handleStoreData] getServerStorageToken() could not find info in ledger on this token:\n', data.storageToken)
           return returnError(request, ANONYMOUS_CANNOT_CONNECT_MSG, 401);
         }
         if (DEBUG) console.log("tokens: ", serverToken)
