@@ -273,6 +273,7 @@ async function handleStoreData(request: Request, env: EnvType) {
 }
 
 // '/api/v2/fetchData': fetches the full shard
+// ToDo: add support to reply with readable stream
 async function handleFetchData(request: Request, env: EnvType) {
     // this endpoint is the only one that looks at searchParams
     const { searchParams } = new URL(request.url)
