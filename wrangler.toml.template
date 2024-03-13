@@ -1,0 +1,48 @@
+# Copyright (c) 2023-2024 384(tm) Inc, All Rights Reserved.
+
+# ergo "<name>.<your CF domain>.workers.dev"
+name = "s_v3_dev"
+
+workers_dev = true
+compatibility_date = "2023-05-07"
+main = "./src/index.ts"
+
+# Replace with your account id
+account_id = '...'
+usage_model = 'unbound'
+
+# You need to set up these KV namespaces in the CF dashboard.
+# The ledger namespace is shared with the channel server
+kv_namespaces = [
+  { binding = "LEDGER_NAMESPACE", id = "...", preview_id = "..." },
+  { binding = "IMAGES_NAMESPACE", id = "...", preview_id = "..." },
+  { binding = "PAGES_NAMESPACE", id = "...", preview_id = "..." },
+]
+
+[env.production]
+name = "s_v3_prod" # default production channel name eg "s.<your CF domain>.workers.dev"
+kv_namespaces = [
+  { binding = "LEDGER_NAMESPACE", id = "...", preview_id = "..." },
+  { binding = "IMAGES_NAMESPACE", id = "...", preview_id = "..." },
+  { binding = "PAGES_NAMESPACE", id = "...", preview_id = "..." },
+]
+
+# note on debug flags: you can simply leave them false here and toggle them to
+# true in the ''.dev.vars'' file; see
+# https://developers.cloudflare.com/workers/configuration/environment-variables/
+# for details
+
+[vars]
+VERSION="..."
+ENVIRONMENT="development"
+# privacy window is the deduplication regularity, default 2 weeks
+PRIVACY_WINDOW=1209600
+DEBUG_ON=false # low-noise debug output
+VERBOSE_ON=false # noisier
+
+[env.production.vars]
+VERSION="..."
+ENVIRONMENT="production"
+PRIVACY_WINDOW=1209600 # 14 days (14 * 24 * 60 * 60 seconds)
+DEBUG_ON=false
+VERBOSE_ON=false
