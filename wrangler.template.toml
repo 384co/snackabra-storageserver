@@ -1,10 +1,10 @@
 # Copyright (c) 2023-2024 384(tm) Inc, All Rights Reserved.
 
 # ergo "<name>.<your CF domain>.workers.dev"
-name = "s_v3_dev"
+name = "storage"
 
 workers_dev = true
-compatibility_date = "2023-05-07"
+compatibility_date = "2024-01-29"
 main = "./src/index.ts"
 
 # Replace with your account id
@@ -20,7 +20,7 @@ kv_namespaces = [
 ]
 
 [env.production]
-name = "s_v3_prod" # default production channel name eg "s.<your CF domain>.workers.dev"
+name = "s" # default production channel name eg "s.<your CF domain>.workers.dev"
 kv_namespaces = [
   { binding = "LEDGER_NAMESPACE", id = "...", preview_id = "..." },
   { binding = "IMAGES_NAMESPACE", id = "...", preview_id = "..." },
@@ -28,15 +28,15 @@ kv_namespaces = [
 ]
 
 # note on debug flags: you can simply leave them false here and toggle them to
-# true in the ''.dev.vars'' file; see
+# true in the ''.dev.vars'' file; for details see
 # https://developers.cloudflare.com/workers/configuration/environment-variables/
-# for details
 
 [vars]
 VERSION="..."
 ENVIRONMENT="development"
 # privacy window is the deduplication regularity, default 2 weeks
 PRIVACY_WINDOW=1209600
+LOG_ERRORS=true
 DEBUG_ON=false # low-noise debug output
 VERBOSE_ON=false # noisier
 
@@ -44,5 +44,6 @@ VERBOSE_ON=false # noisier
 VERSION="..."
 ENVIRONMENT="production"
 PRIVACY_WINDOW=1209600 # 14 days (14 * 24 * 60 * 60 seconds)
+LOG_ERRORS=true
 DEBUG_ON=false
 VERBOSE_ON=false
