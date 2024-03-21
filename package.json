@@ -21,9 +21,9 @@
     "typescript": "^5.0.4",
     "webpack": "^5.84.1",
     "worker-loader": "^3.0.8",
-    "wrangler": "^3.0.0"
+    "wrangler": "^3.36.0"
   },
   "dependencies": {
-    "snackabra": "^2.0.0"
+    "snackabra": "^1.0.0"
   }
 }
