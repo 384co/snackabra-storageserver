@@ -35,6 +35,8 @@ export { default } from './workers'
 const PRIVACY_WINDOW_DEFAULT = 14 * 24 * 60 * 60;
 const PRIVACY_WINDOW_MINIMUM = 7 * 24 * 60 * 60;
 
+const SEP = '\n' + '*'.repeat(80) + '\n';
+
 // called on all 'entry points' to set the debug level
 function setServerDebugLevel(env: EnvType) {
     dbg.DEBUG = env.DEBUG_ON ? true : false;
@@ -232,10 +234,11 @@ async function handleStoreRequest(request: Request, env: EnvType) {
 }
 
 async function generateVerificationString(): Promise<string> {
-    const randomBytes = new Uint8Array(16);
-    crypto.getRandomValues(randomBytes);
-    const verificationArray = Array.from(randomBytes, byte => byte.toString(16).padStart(2, '0'));
-    return verificationArray.join('');
+    const r = new Uint16Array(4);
+    crypto.getRandomValues(r);
+    const verification = Array.from(r, n => n.toString()).join('.');
+    console.log("Generated verification token:\n", verification);
+    return verification;
 }
 
 // '/api/v2/storeData': performs actual storage
