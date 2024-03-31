@@ -8,6 +8,7 @@ export type EnvType = {
   STORAGE_SERVER: string,
   DEBUG_ON: boolean,
   VERBOSE_ON: boolean,
+  LOG_ERRORS: boolean,
   ENVIRONMENT?: string,
   PRIVACY_WINDOW?: number,
 }
