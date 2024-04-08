@@ -23,11 +23,11 @@
 import type { EnvType } from './env'
 import { _sb_assert, returnResult, returnResultJson,
     returnBinaryResult, returnError, getServerStorageToken,
-    ANONYMOUS_CANNOT_CONNECT_MSG, genKey, dbg } from './workers'
+    ANONYMOUS_CANNOT_CONNECT_MSG, genKey, dbg, serverConstants } from './workers'
 
 // import type { SBPayload } from 'snackabra'
-import { assemblePayload, extractPayload, arrayBufferToBase62, base62ToArrayBuffer,
-        SBStorageToken, SBObjectHandle, stringify_SBObjectHandle, Base62Encoded, StorageApi, ShardInfo } from 'snackabra'
+import { assemblePayload, extractPayload, arrayBufferToBase62,
+        SBStorageToken, Base62Encoded, StorageApi, ShardInfo } from 'snackabra'
 
 export { default } from './workers'
 
@@ -128,8 +128,6 @@ function _check_Shard(s: Shard): boolean {
             return false;
     }
 }
-
-
 
 // function infoToShard(info: ShardInfo, data: ArrayBuffer): Shard | null {
 //     // specific fields only
@@ -245,9 +243,6 @@ async function generateVerificationString(): Promise<string> {
 async function handleStoreData(request: Request, env: EnvType) {
     if (dbg.DEBUG) console.log("==== handleStoreData()")
     try {
-        // const id = new URL(request.url).searchParams.get('id')
-        // if (!id) return returnError(request, "missing 'id'")
-
         const data = extractPayload(await request.arrayBuffer()).payload;
         if (!data || !data.id || !data.data || !data.iv || !data.salt || !data.storageToken) {
             if (dbg.DEBUG) console.error('Ledger(s) refused storage request - malformed request', data)
@@ -280,6 +275,13 @@ async function handleStoreData(request: Request, env: EnvType) {
         const storedData = await env.IMAGES_NAMESPACE.get(key, { type: "arrayBuffer" });
         let verificationString
         if (storedData == null) {
+            // new data; first check size constraints
+            const dataSize = data.data.byteLength;
+            if (dataSize > serverConstants.STORAGE_SIZE_MAX) {
+                if (dbg.LOG_ERRORS) console.error("Ledger(s) refused storage request - shard too large")
+                return returnError(request, `Data too large, max size is ${serverConstants.STORAGE_SIZE_MAX} bytes`, 413)
+            }
+
             if (dbg.DEBUG) console.log("======== data was new")
             const verKey = genKey(data.id, 'V')
             const newShard: ShardAtRest = {
@@ -288,7 +290,7 @@ async function handleStoreData(request: Request, env: EnvType) {
                 iv: data.iv,
                 salt: data.salt,
                 type: 'D',
-                actualSize: data.data.byteLength,
+                actualSize: dataSize,
                 data: data.data,
             }
             verificationString = await generateVerificationString();
@@ -389,6 +391,7 @@ async function verifyStorageToken(data: ArrayBuffer, id: string, _env: EnvType, 
     const dataHash = arrayBufferToBase62(digest);
     if (!dataHash || !id) return false;
     if (id.slice(-dataHash.length) !== dataHash) return false;
+    // expects precise size match
     if (!_ledger_resp || _ledger_resp.used || _ledger_resp.size !== data.byteLength) return false;
     return true;
 }
