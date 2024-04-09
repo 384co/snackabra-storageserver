@@ -10,7 +10,9 @@
   "license": "GPL-3.0-only",
   "private": false,
   "scripts": {
+    "dev": "wrangler dev --port 3843",
     "start": "wrangler dev --port 3843",
+    "tail": "wrangler tail",
     "deploy": "wrangler deploy",
     "deploy:prod": "wrangler deploy --env production"
   },
