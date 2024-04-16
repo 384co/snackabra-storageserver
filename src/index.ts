@@ -239,7 +239,7 @@ async function generateVerificationString(): Promise<string> {
     const r = new Uint16Array(4);
     crypto.getRandomValues(r);
     const verification = Array.from(r, n => n.toString()).join('.');
-    console.log("Generated verification token:\n", verification);
+    if (dbg.DEBUG) console.log("Generated verification token:", verification);
     return verification;
 }
 
@@ -269,7 +269,7 @@ async function handleStoreData(request: Request, env: EnvType) {
           return returnError(request, ANONYMOUS_CANNOT_CONNECT_MSG);
         }
         if (dbg.DEBUG) console.log("tokens: ", serverToken)
-        if (!verifyStorageToken(data, data.id, env, serverToken)) {
+        if (!verifyStorageToken(data.data, data.id, env, serverToken)) {
             if (dbg.LOG_ERRORS) console.error('Ledger(s) refused storage request - authentication or storage budget issue, or malformed request')
             return returnError(request, ANONYMOUS_CANNOT_CONNECT_MSG);
         }
@@ -391,6 +391,8 @@ async function handleFetchData(request: Request, env: EnvType) {
 }
 
 async function verifyStorageToken(data: ArrayBuffer, id: string, _env: EnvType, _ledger_resp: SBStorageToken) {
+    if (!(data instanceof ArrayBuffer)) throw new Error("verifyStorageToken() called with incorrect data types (?) (Internal Error) (L390)")
+    if (!(typeof id === 'string')) throw new Error("verifyStorageToken() called with incorrect data types (?) (Internal Error) (L392)")
     const digest = await crypto.subtle.digest('SHA-256', data);
     const dataHash = arrayBufferToBase62(digest);
     if (!dataHash || !id) return false;
