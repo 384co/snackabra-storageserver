@@ -71,6 +71,10 @@ export async function handleApiRequest(path: Array<string>, request: Request, en
     }
 }
 
+
+// ToDo: we could probably improve capacity of every worker by using streams
+// both on the incoming shard uploads, and in storing them, etc.
+
 // shard types are essentially subsets of SBObjectHandle; organized strictly
 // here for conservative code.
 
