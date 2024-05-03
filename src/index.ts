@@ -26,7 +26,7 @@ import { _sb_assert, returnResult, returnResultJson,
     ANONYMOUS_CANNOT_CONNECT_MSG, genKey, dbg, serverConstants } from './workers'
 
 // import type { SBPayload } from 'snackabra'
-import { assemblePayload, extractPayload, arrayBufferToBase62,
+import { Snackabra, assemblePayload, extractPayload, arrayBufferToBase62,
         SBStorageToken, Base62Encoded, StorageApi, ShardInfo } from 'snackabra'
 
 export { default } from './workers'
@@ -42,8 +42,12 @@ function setServerDebugLevel(env: EnvType) {
     dbg.DEBUG = env.DEBUG_ON ? true : false;
     dbg.LOG_ERRORS = env.LOG_ERRORS || dbg.DEBUG ? true : false;
     dbg.DEBUG2 = env.VERBOSE_ON ? true : false;
-  }
-  
+}
+
+function getBaseUrl(request: Request, env: EnvType) {
+    const url = new URL(request.url);
+    return `${url.protocol}//${url.hostname}${url.port ? `:${url.port}` : ''}`;
+}
 
 // 'path' is the request path, starting AFTER '/api/v2'
 export async function handleApiRequest(path: Array<string>, request: Request, env: EnvType) {
@@ -53,7 +57,9 @@ export async function handleApiRequest(path: Array<string>, request: Request, en
             case 'info':
                 return returnResultJson(request, {
                     version: env.VERSION,
-                    motd: 'hello from alpha v3'
+                    channelServer: '<error: current version does not provide this>',
+                    storageServer: getBaseUrl(request, env),
+                    jslibVersion: Snackabra.version
                 })
             case 'storeRequest':
                 return await handleStoreRequest(request, env)
