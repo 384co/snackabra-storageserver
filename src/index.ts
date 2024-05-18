@@ -393,9 +393,7 @@ async function handleFetchData(request: Request, env: EnvType) {
         return returnError(request, "[Internal Error] [L385]")
     if (dbg.DEBUG) console.log("[handleFetchData] Done, returning data.")
 
-    return returnBinaryResult(request, storedData, {
-        'Cache-Control': 'max-age=31536000, immutable'
-    });
+    return returnBinaryResult(request, storedData); // note: binary results will default to immutable
 }
 
 async function verifyStorageToken(data: ArrayBuffer, id: string, _env: EnvType, _ledger_resp: SBStorageToken) {
