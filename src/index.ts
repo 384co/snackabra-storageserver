@@ -374,7 +374,7 @@ async function handleFetchData(request: Request, env: EnvType) {
     const verKey = genKey(id, 'V')
     const storedVerData = await env.IMAGES_NAMESPACE.get(verKey, { type: "arrayBuffer" })
     if (!storedVerData) {
-        if (dbg.LOG_ERRORS) console.error("[handleFetchData] Requested shard with missing verification, id ", id)
+        if (dbg.LOG_ERRORS) console.error("[handleFetchData] Missing verification (shard not present on this server), shard id ", id)
         return returnError(request, ANONYMOUS_CANNOT_CONNECT_MSG)
     } else {
         const storedVerification = (extractPayload(storedVerData).payload as ShardVerification).verification
