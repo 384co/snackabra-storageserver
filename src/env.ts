@@ -6,9 +6,10 @@ export type EnvType = {
   LEDGER_NAMESPACE: KVNamespace,
   IMAGES_NAMESPACE: KVNamespace,
   STORAGE_SERVER: string,
-  DEBUG_ON: boolean,
+  DEBUG_LEVEL_1: boolean,
   VERBOSE_ON: boolean,
   LOG_ERRORS: boolean,
   ENVIRONMENT?: string,
   PRIVACY_WINDOW?: number,
+  IS_LOCAL: boolean, // set to true by 'yarn start' to signal we're on local dev
 }

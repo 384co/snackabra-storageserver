@@ -23,7 +23,9 @@
 import type { EnvType } from './env'
 import { _sb_assert, returnResult, returnResultJson,
     returnBinaryResult, returnError, getServerStorageToken,
-    ANONYMOUS_CANNOT_CONNECT_MSG, genKey, dbg, serverConstants } from './workers'
+    ANONYMOUS_CANNOT_CONNECT_MSG, genKey, dbg, serverConstants,
+    setServerDebugLevel,
+} from './workers'
 
 // import type { SBPayload } from 'snackabra'
 import { Snackabra, assemblePayload, extractPayload, arrayBufferToBase62,
@@ -37,12 +39,12 @@ const PRIVACY_WINDOW_MINIMUM = 7 * 24 * 60 * 60;
 
 const SEP = '\n' + '*'.repeat(80) + '\n';
 
-// called on all 'entry points' to set the debug level
-function setServerDebugLevel(env: EnvType) {
-    dbg.DEBUG = env.DEBUG_ON ? true : false;
-    dbg.LOG_ERRORS = env.LOG_ERRORS || dbg.DEBUG ? true : false;
-    dbg.DEBUG2 = env.VERBOSE_ON ? true : false;
-}
+// // called on all 'entry points' to set the debug level
+// function setServerDebugLevel(env: EnvType) {
+//     dbg.DEBUG = env.DEBUG_ON ? true : false;
+//     dbg.LOG_ERRORS = env.LOG_ERRORS || dbg.DEBUG ? true : false;
+//     dbg.DEBUG2 = env.VERBOSE_ON ? true : false;
+// }
 
 function getBaseUrl(request: Request, env: EnvType) {
     const url = new URL(request.url);
