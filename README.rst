@@ -7,8 +7,7 @@
 Snackabra Storage Server
 ========================
 
-_Note: this is deprecated or change in places, Cloudlfare has made it much
-simpler to run workerd locally. Hope to updated this soon._
+_This is archived dev code. New development is done in os384 servers_
 
 For general documentation on Snackabra see:
 
