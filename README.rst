@@ -7,6 +7,9 @@
 Snackabra Storage Server
 ========================
 
+_This is abandoned/tabled main fork. Storage server development
+ has moved to os384 servers_
+
 For general documentation on Snackabra see:
 
 * https://snackabra.io
