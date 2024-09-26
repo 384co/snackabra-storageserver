@@ -7,7 +7,7 @@
 Snackabra Storage Server
 ========================
 
-_This is archived dev code. New development is done in os384 servers_
+This is archived dev code. New development is done in os384 servers.
 
 For general documentation on Snackabra see:
 
